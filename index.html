@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jídelníček</title>
+    <title>Jídelníček Widget</title>
     <style>
         :root {
-            --bg-deep: #0e0a12;
-            --bg-widget: #2a1b2d;
+            --bg-widget: #3b2942;
             --bg-header: #4c2b4d;
-            --bg-card: #1d121f;
+            --bg-card: #231726;
             --accent-pink: #ef91c5;
             --text-main: #f1d8e6;
             --text-dim: #9d8396;
@@ -18,59 +17,60 @@
 
         body, html { 
             margin: 0; padding: 0; height: 100%; 
-            background-color: transparent; /* Aby splynul s webem */
+            background-color: transparent;
             font-family: var(--font-family);
             color: var(--text-main);
+            overflow: hidden;
         }
 
         .widget {
             background-color: var(--bg-widget);
             border-radius: 28px;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
             height: 100vh;
-            max-width: 100%;
+            width: 100%;
         }
 
         .header {
             background-color: var(--bg-header);
-            padding: 16px 24px;
+            padding: 18px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .header-title {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             font-weight: 600;
         }
 
-        .flower { color: var(--accent-pink); font-size: 1.6rem; }
-        .dots { color: var(--text-dim); letter-spacing: 2px; font-weight: bold; }
+        .flower { color: var(--accent-pink); font-size: 1.5rem; }
+        .dots { color: var(--text-dim); letter-spacing: 2px; }
 
         .content {
-            padding: 20px;
+            padding: 10px 20px 20px 20px;
             overflow-y: auto;
             flex-grow: 1;
         }
 
         .section-title {
             color: var(--accent-pink);
-            font-size: 1.1rem;
-            margin: 15px 0 10px 4px;
+            font-size: 1rem;
+            margin: 20px 0 10px 4px;
             font-weight: 500;
+            text-transform: capitalize;
         }
 
         .card {
             background-color: var(--bg-card);
             border-radius: 12px;
-            padding: 16px;
+            padding: 15px;
             margin-bottom: 12px;
-            border-left: 0px solid var(--accent-pink);
         }
 
         .card-header {
@@ -82,16 +82,16 @@
         .tag {
             background-color: var(--accent-pink);
             color: var(--bg-card);
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 4px;
             font-weight: 800;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             min-width: 32px;
             text-align: center;
         }
 
-        .dish-name { line-height: 1.4; font-size: 1rem; }
-        .dish-name b { color: var(--accent-pink); font-weight: 600; }
+        .dish-name { line-height: 1.4; font-size: 0.95rem; }
+        .dish-name b { color: var(--accent-pink); font-weight: 500; }
 
         .meta {
             display: flex;
@@ -101,26 +101,21 @@
             opacity: 0.6;
         }
 
-        .icon { width: 16px; height: 16px; fill: currentColor; }
-
-        .allergens {
-            display: flex;
-            gap: 6px;
-        }
-
+        .icon { width: 14px; height: 14px; fill: currentColor; }
+        .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
         .allergen-tag {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             background: rgba(255,255,255,0.05);
-            padding: 1px 6px;
-            border-radius: 10px;
+            padding: 1px 5px;
+            border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* Scrollbar styling */
-        .content::-webkit-scrollbar { width: 6px; }
-        .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-
         .loading { text-align: center; padding: 50px; color: var(--text-dim); }
+
+        /* Scrollbar */
+        .content::-webkit-scrollbar { width: 5px; }
+        .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -129,16 +124,23 @@
     <div class="header">
         <div class="header-title">
             <span class="flower">✿</span>
-            <span id="label">Dnešní Menu</span>
+            <span id="label">Načítám...</span>
         </div>
-        <div class="dots">...</div>
+        <div class="dots">● ● ●</div>
     </div>
     <div class="content" id="app">
-        <div class="loading">Načítám jídelníček...</div>
+        <div class="loading">Hledám nejbližší menu...</div>
     </div>
 </div>
 
 <script>
+    // Funkce pro získání lokálního data YYYY-MM-DD bez problémů s časovým pásmem
+    function toLocalISO(date) {
+        const offset = date.getTimezoneOffset();
+        const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+        return localDate.toISOString().split('T')[0];
+    }
+
     async function init() {
         const app = document.getElementById('app');
         const label = document.getElementById('label');
@@ -151,24 +153,39 @@
             const now = new Date();
             let targetDate = new Date(now);
 
-            // Logika přepínání: po 14:00 na další den
+            // 1. Logika překlopení času (14:00)
             if (now.getHours() >= 14) {
                 targetDate.setDate(targetDate.getDate() + 1);
             }
 
-            // Víkendová logika (Pátek odpoledne/So/Ne -> Pondělí)
+            // 2. Víkendová logika (pokud je cíl Sobota(6) nebo Neděle(0), posunout na Pondělí(1))
             if (targetDate.getDay() === 6) targetDate.setDate(targetDate.getDate() + 2);
-            if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
+            else if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
 
-            const dateStr = targetDate.toISOString().split('T')[0];
-            const isToday = new Date().toISOString().split('T')[0] === dateStr;
-            label.innerText = isToday ? 'Dnešní Menu' : 'Menu na zítra';
+            const dateStr = toLocalISO(targetDate);
+            const todayStr = toLocalISO(now);
+
+            // Nastavení popisku v hlavičce
+            if (dateStr === todayStr) {
+                label.innerText = 'Dnešní Menu';
+            } else if (targetDate.getDay() === 1) {
+                label.innerText = 'Menu na pondělí';
+            } else {
+                label.innerText = 'Menu na zítra';
+            }
 
             const days = xml.getElementsByTagName("den");
             let dayData = Array.from(days).find(d => d.getAttribute("datum") === dateStr);
 
+            // Pokud pro pondělí ještě není menu, zkusíme najít jakýkoliv nejbližší den v XML
+            if (!dayData && days.length > 0) {
+                dayData = days[0]; // Zobrazíme aspoň první dostupný den, aby widget nebyl prázdný
+                const fallbackDate = dayData.getAttribute("datum").split('-').reverse().join('.');
+                label.innerText = 'Menu na ' + fallbackDate;
+            }
+
             if (!dayData) {
-                app.innerHTML = '<div class="loading">Jídelníček pro tento den nebyl nalezen.</div>';
+                app.innerHTML = '<div class="loading">Momentálně není k dispozici žádné menu.</div>';
                 return;
             }
 
@@ -177,12 +194,10 @@
             const obedy = items.filter(i => i.getAttribute("druh").toLowerCase().includes("oběd"));
 
             let html = '';
-
             if (polevky.length > 0) {
                 html += '<div class="section-title">Polévka</div>';
                 polevky.forEach(i => html += renderItem(i));
             }
-
             if (obedy.length > 0) {
                 html += '<div class="section-title">Oběd</div>';
                 obedy.forEach(i => html += renderItem(i));
@@ -191,7 +206,7 @@
             app.innerHTML = html;
 
         } catch (e) {
-            app.innerHTML = '<div class="loading">Nepodařilo se načíst data.</div>';
+            app.innerHTML = '<div class="loading">Chyba při komunikaci s jídelnou.</div>';
         }
     }
 
@@ -201,13 +216,13 @@
         const alergeny = item.getAttribute("alergeny") ? item.getAttribute("alergeny").split(',') : [];
         
         const tag = druh.split(' ').pop();
-        const druhName = druh.substring(0, druh.lastIndexOf(" "));
+        const druhBase = druh.substring(0, druh.lastIndexOf(" "));
 
         return `
             <div class="card">
                 <div class="card-header">
                     <div class="tag">${tag}</div>
-                    <div class="dish-name"><b>${druhName} ${tag}</b> - ${nazev}</div>
+                    <div class="dish-name"><b>${druhBase} ${tag}</b> - ${nazev}</div>
                 </div>
                 <div class="meta">
                     <svg class="icon" viewBox="0 0 24 24"><path d="M21,3C21,3 15.8,3.5 12,7.2C10.1,9.1 8.8,11.4 8,14H4L2,16V17H4.5L5,17.5L5,20H6L8,18V14C10.6,13.2 12.9,11.9 14.8,10C18.5,6.2 19,1 19,1M14,6C14,5.4 14.4,5 15,5C15.6,5 16,5.4 16,6C16,6.6 15.6,7 15,7C14.4,7 14,6.6 14,6Z" /></svg>
