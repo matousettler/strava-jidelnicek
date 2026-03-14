@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jídelníček Widget</title>
-    <!-- Import fontu Nunito -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -40,6 +39,8 @@
             display: flex; 
             align-items: center; 
             flex-shrink: 0; 
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
 
         .header-title { 
@@ -50,16 +51,14 @@
             font-weight: 700; 
         }
 
-        .logo-img { 
-            width: 28px; 
-            height: 28px; 
-            object-fit: contain;
-        }
+        .logo-img { width: 28px; height: 28px; object-fit: contain; }
 
         .content { 
             padding: 10px 20px 20px 20px; 
             overflow-y: auto; 
             flex-grow: 1; 
+            /* Plynulý posun pro naši animaci */
+            scroll-behavior: smooth; 
         }
 
         .section-title { 
@@ -78,11 +77,7 @@
             margin-bottom: 12px; 
         }
 
-        .card-header { 
-            display: flex; 
-            gap: 12px; 
-            align-items: flex-start; 
-        }
+        .card-header { display: flex; gap: 12px; align-items: flex-start; }
 
         .tag { 
             background: var(--accent-pink); 
@@ -96,36 +91,14 @@
             flex-shrink: 0; 
         }
 
-        .dish-name { 
-            line-height: 1.4; 
-            font-size: 1rem; 
-            font-weight: 400;
-        }
+        .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 400; }
+        .dish-name b { color: var(--accent-pink); font-weight: 700; }
 
-        .dish-name b { 
-            color: var(--accent-pink); 
-            font-weight: 700; 
-        }
+        .meta { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
 
-        .meta { 
-            display: flex; 
-            align-items: center; 
-            gap: 6px; 
-            margin-top: 12px; 
-        }
+        .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; margin-right: 4px; }
 
-        .allergen-label {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            font-weight: 600;
-            margin-right: 4px;
-        }
-
-        .allergens {
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
+        .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
 
         .allergen-tag { 
             font-size: 0.7rem; 
@@ -135,18 +108,12 @@
             border-radius: 6px; 
             border: 1px solid rgba(255,255,255,0.1); 
             cursor: help;
-            transition: all 0.2s;
-        }
-
-        .allergen-tag:hover {
-            background: var(--accent-pink);
-            color: var(--bg-card);
-            border-color: var(--accent-pink);
         }
 
         .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
-        .content::-webkit-scrollbar { width: 5px; }
-        .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        
+        /* Skrytí scrollbaru, aby nerušil automatickou animaci */
+        .content::-webkit-scrollbar { width: 0; background: transparent; }
     </style>
 </head>
 <body>
@@ -163,23 +130,36 @@
 </div>
 
 <script>
-    // Seznam alergenů pro tooltipy
     const ALLERGENS_MAP = {
         "01": "Obiloviny obsahující lepek", "1": "Obiloviny obsahující lepek",
-        "02": "Korýši", "2": "Korýši",
-        "03": "Vejce", "3": "Vejce",
-        "04": "Ryby", "4": "Ryby",
-        "05": "Arašídy", "5": "Arašídy",
+        "02": "Korýši", "2": "Korýši", "03": "Vejce", "3": "Vejce",
+        "04": "Ryby", "4": "Ryby", "05": "Arašídy", "5": "Arašídy",
         "06": "Sójové boby (sója)", "6": "Sójové boby (sója)",
-        "07": "Mléko", "7": "Mléko",
-        "08": "Skořápkové plody (ořechy)", "8": "Skořápkové plody (ořechy)",
-        "09": "Celer", "9": "Celer",
-        "10": "Hořčice",
-        "11": "Sezamová semena",
-        "12": "Oxid siřičitý a siřičitany",
-        "13": "Vlčí bob (lupina)",
-        "14": "Měkkýši"
+        "07": "Mléko", "7": "Mléko", "08": "Skořápkové plody (ořechy)", "8": "Skořápkové plody (ořechy)",
+        "09": "Celer", "9": "Celer", "10": "Hořčice", "11": "Sezamová semena",
+        "12": "Oxid siřičitý a siřičitany", "13": "Vlčí bob (lupina)", "14": "Měkkýši"
     };
+
+    // FUNKCE PRO AUTOMATICKÉ SCROLLOVÁNÍ
+    function startAutoScroll() {
+        const container = document.getElementById('app');
+        let direction = 'down';
+
+        setInterval(() => {
+            // Kontrola, zda obsah vůbec přetéká
+            const canScroll = container.scrollHeight > container.clientHeight;
+            
+            if (canScroll) {
+                if (direction === 'down') {
+                    container.scrollTop = container.scrollHeight - container.clientHeight;
+                    direction = 'up';
+                } else {
+                    container.scrollTop = 0;
+                    direction = 'down';
+                }
+            }
+        }, 12000); // Interval 12 sekund
+    }
 
     async function init() {
         const app = document.getElementById('app');
@@ -192,7 +172,6 @@
             const now = new Date();
             let target = new Date(now);
             
-            // Logika víkendu a 14:00
             if (target.getDay() === 6) target.setDate(target.getDate() + 2);
             else if (target.getDay() === 0) target.setDate(target.getDate() + 1);
             else if (target.getDay() === 5 && now.getHours() >= 14) target.setDate(target.getDate() + 3);
@@ -244,6 +223,9 @@
             }
             app.innerHTML = html;
 
+            // Spuštění animace po načtení dat
+            startAutoScroll();
+
         } catch (e) {
             app.innerHTML = `<div class="status-msg">Chyba: Nepodařilo se spojit s jídelnou.</div>`;
         }
@@ -253,12 +235,11 @@
         const tag = m.druh.split(' ').filter(x => x).pop();
         const baseName = m.druh.substring(0, m.druh.lastIndexOf(tag)).trim();
         
-        // Zpracování alergenů do tagů s tooltipem
         let allergensHtml = '';
         if (m.alergeny) {
             const list = m.alergeny.split(',').map(a => a.trim());
             allergensHtml = list.map(code => {
-                const cleanCode = code.split(' ')[0]; // Ošetření případného textu za číslem
+                const cleanCode = code.split(' ')[0];
                 const name = ALLERGENS_MAP[cleanCode] || "Neznámý alergen";
                 return `<span class="allergen-tag" title="${name}">${cleanCode}</span>`;
             }).join('');
