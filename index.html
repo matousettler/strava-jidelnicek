@@ -45,7 +45,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 600;
         }
 
@@ -63,7 +63,6 @@
             font-size: 1rem;
             margin: 20px 0 10px 4px;
             font-weight: 500;
-            text-transform: capitalize;
         }
 
         .card {
@@ -111,7 +110,12 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        .loading { text-align: center; padding: 50px; color: var(--text-dim); }
+        .loading, .no-data { 
+            text-align: center; 
+            padding: 50px 20px; 
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
 
         /* Scrollbar */
         .content::-webkit-scrollbar { width: 5px; }
@@ -124,21 +128,22 @@
     <div class="header">
         <div class="header-title">
             <span class="flower">✿</span>
-            <span id="label">Načítám...</span>
+            <span id="label">Zjišťuji menu...</span>
         </div>
         <div class="dots">● ● ●</div>
     </div>
     <div class="content" id="app">
-        <div class="loading">Hledám nejbližší menu...</div>
+        <div class="loading">Načítám data z jídelny...</div>
     </div>
 </div>
 
 <script>
-    // Funkce pro získání lokálního data YYYY-MM-DD bez problémů s časovým pásmem
-    function toLocalISO(date) {
-        const offset = date.getTimezoneOffset();
-        const localDate = new Date(date.getTime() - (offset * 60 * 1000));
-        return localDate.toISOString().split('T')[0];
+    function formatDate(date) {
+        // Vrací YYYY-MM-DD
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
 
     async function init() {
@@ -147,51 +152,69 @@
 
         try {
             const res = await fetch('/api/menu');
+            if (!res.ok) throw new Error('API error');
             const xmlText = await res.text();
             const xml = new DOMParser().parseFromString(xmlText, "text/xml");
 
             const now = new Date();
             let targetDate = new Date(now);
 
-            // 1. Logika překlopení času (14:00)
+            // Logika překlopení dne v 14:00
             if (now.getHours() >= 14) {
                 targetDate.setDate(targetDate.getDate() + 1);
             }
 
-            // 2. Víkendová logika (pokud je cíl Sobota(6) nebo Neděle(0), posunout na Pondělí(1))
+            // Víkendová logika (v So/Ne skočit na Pondělí)
             if (targetDate.getDay() === 6) targetDate.setDate(targetDate.getDate() + 2);
             else if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
 
-            const dateStr = toLocalISO(targetDate);
-            const todayStr = toLocalISO(now);
+            const targetStrISO = formatDate(targetDate);
+            const days = Array.from(xml.getElementsByTagName("den"));
 
-            // Nastavení popisku v hlavičce
-            if (dateStr === todayStr) {
-                label.innerText = 'Dnešní Menu';
-            } else if (targetDate.getDay() === 1) {
+            // Hledání dne v XML (zkoušíme různé formáty datumu)
+            let dayData = days.find(d => {
+                const attr = d.getAttribute("datum");
+                // Porovnáme ISO (2026-03-16) nebo český formát (16.03.2026)
+                return attr === targetStrISO || attr === targetStrISO.split('-').reverse().join('.');
+            });
+
+            // Nastavení nadpisu
+            if (targetDate.getDay() === 1 && formatDate(new Date()) !== targetStrISO) {
                 label.innerText = 'Menu na pondělí';
+            } else if (formatDate(new Date()) === targetStrISO) {
+                label.innerText = 'Dnešní Menu';
             } else {
-                label.innerText = 'Menu na zítra';
+                label.innerText = 'Menu na ' + targetDate.toLocaleDateString('cs-CZ');
             }
 
-            const days = xml.getElementsByTagName("den");
-            let dayData = Array.from(days).find(d => d.getAttribute("datum") === dateStr);
-
-            // Pokud pro pondělí ještě není menu, zkusíme najít jakýkoliv nejbližší den v XML
+            // Pokud cílový den v XML vůbec není, zkusíme vzít ten úplně poslední/nejbližší budoucí
             if (!dayData && days.length > 0) {
-                dayData = days[0]; // Zobrazíme aspoň první dostupný den, aby widget nebyl prázdný
-                const fallbackDate = dayData.getAttribute("datum").split('-').reverse().join('.');
-                label.innerText = 'Menu na ' + fallbackDate;
+                dayData = days[days.length - 1]; 
+                const dAttr = dayData.getAttribute("datum");
+                label.innerText = 'Menu na ' + dAttr.split('-').reverse().join('.');
             }
 
             if (!dayData) {
-                app.innerHTML = '<div class="loading">Momentálně není k dispozici žádné menu.</div>';
+                app.innerHTML = '<div class="no-data">Aktuálně není v systému žádný jídelníček.</div>';
                 return;
             }
 
             const items = Array.from(dayData.getElementsByTagName("polozka"));
-            const polevky = items.filter(i => i.getAttribute("druh").toLowerCase().includes("polévka"));
-            const obedy = items.filter(i => i.getAttribute("druh").toLowerCase().includes("oběd"));
+            
+            // Filtrování jídel s odolností proti diakritice
+            const polevky = items.filter(i => {
+                const d = i.getAttribute("druh").toLowerCase();
+                return d.includes("polévka") || d.includes("polevka");
+            });
+            const obedy = items.filter(i => {
+                const d = i.getAttribute("druh").toLowerCase();
+                return d.includes("oběd") || d.includes("obed");
+            });
+
+            if (items.length === 0 || (polevky.length === 0 && obedy.length === 0)) {
+                app.innerHTML = '<div class="no-data">Jídelníček pro tento den ještě<br>nebyl sestaven.</div>';
+                return;
+            }
 
             let html = '';
             if (polevky.length > 0) {
@@ -206,17 +229,18 @@
             app.innerHTML = html;
 
         } catch (e) {
-            app.innerHTML = '<div class="loading">Chyba při komunikaci s jídelnou.</div>';
+            app.innerHTML = '<div class="no-data">Chyba při stahování dat.<br>Zkuste to prosím později.</div>';
         }
     }
 
     function renderItem(item) {
-        const druh = item.getAttribute("druh");
-        const nazev = item.getAttribute("nazev");
-        const alergeny = item.getAttribute("alergeny") ? item.getAttribute("alergeny").split(',') : [];
+        const druh = item.getAttribute("druh") || "";
+        const nazev = item.getAttribute("nazev") || "";
+        const alergenyStr = item.getAttribute("alergeny") || "";
+        const alergeny = alergenyStr ? alergenyStr.split(',') : [];
         
         const tag = druh.split(' ').pop();
-        const druhBase = druh.substring(0, druh.lastIndexOf(" "));
+        const druhBase = druh.includes(" ") ? druh.substring(0, druh.lastIndexOf(" ")) : druh;
 
         return `
             <div class="card">
