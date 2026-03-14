@@ -87,12 +87,6 @@
                 dayData = days.find(node => node.getElementsByTagName("polozka").length > 0);
             }
 
-            if (!dayData) {
-                app.innerHTML = '<div class="status-msg">Aktuálně není k dispozici žádný jídelníček.</div>';
-                label.innerText = "Menu nenalezeno";
-                return;
-            }
-
             const foundDate = dayData.getAttribute("datum").replace(/-/g, '.');
             label.innerText = `Menu na ${foundDate}`;
 
