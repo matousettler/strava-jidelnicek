@@ -21,19 +21,16 @@
         .flower { color: var(--accent-pink); font-size: 1.5rem; }
         .dots { color: var(--text-dim); letter-spacing: 2px; }
         .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; }
-        .section-title { color: var(--accent-pink); font-size: 1rem; margin: 20px 0 10px 4px; font-weight: 500; text-transform: capitalize; }
+        .section-title { color: var(--accent-pink); font-size: 1rem; margin: 20px 0 10px 4px; font-weight: 500; }
         .card { background-color: var(--bg-card); border-radius: 12px; padding: 15px; margin-bottom: 12px; }
         .card-header { display: flex; gap: 12px; align-items: flex-start; }
-        .tag { background-color: var(--accent-pink); color: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.8rem; min-width: 34px; text-align: center; flex-shrink: 0; }
+        .tag { background-color: var(--accent-pink); color: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.8rem; min-width: 36px; text-align: center; flex-shrink: 0; }
         .dish-name { line-height: 1.4; font-size: 0.95rem; }
         .dish-name b { color: var(--accent-pink); font-weight: 600; }
         .meta { display: flex; align-items: center; gap: 12px; margin-top: 12px; opacity: 0.6; }
         .icon { width: 14px; height: 14px; fill: currentColor; }
-        .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
-        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
-        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
-        .content::-webkit-scrollbar { width: 5px; }
-        .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); margin-right: 4px; }
+        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -42,7 +39,7 @@
         <div class="header-title"><span class="flower">✿</span><span id="label">Načítám...</span></div>
         <div class="dots">● ● ●</div>
     </div>
-    <div class="content" id="app"><div class="status-msg">Připojuji se k jídelně...</div></div>
+    <div class="content" id="app"><div class="status-msg">Načítám jídelníček...</div></div>
 </div>
 
 <script>
@@ -58,84 +55,88 @@
             const now = new Date();
             let target = new Date(now);
 
-            // Logika 14:00
-            if (now.getHours() >= 14) target.setDate(target.getDate() + 1);
-            // Logika víkend -> pondělí
-            if (target.getDay() === 6) target.setDate(target.getDate() + 2);
-            else if (target.getDay() === 0) target.setDate(target.getDate() + 1);
+            // LOGIKA PŘEPÍNÁNÍ:
+            // Pokud je víkend (So=6, Ne=0) nebo Pátek po 14:00 -> jdi na pondělí
+            if (target.getDay() === 6) { // Sobota
+                target.setDate(target.getDate() + 2);
+            } else if (target.getDay() === 0) { // Neděle
+                target.setDate(target.getDate() + 1);
+            } else if (target.getDay() === 5 && now.getHours() >= 14) { // Pátek odpo
+                target.setDate(target.getDate() + 3);
+            } else if (now.getHours() >= 14) { // Ostatní dny odpo -> zítřek
+                target.setDate(target.getDate() + 1);
+            }
 
             const d = String(target.getDate()).padStart(2, '0');
             const m = String(target.getMonth() + 1).padStart(2, '0');
             const y = target.getFullYear();
 
-            // Varianty formátů, které Strava používá
-            const possibleDates = [`${y}-${m}-${d}`, `${d}-${m}-${y}`, `${d}.${m}.${y}`];
+            // Strava API používá různé formáty datumu, vyzkoušíme všechny
+            const searchDates = [`${y}-${m}-${d}`, `${d}.${m}.${y}`, `${d}-${m}-${y}`];
             
             const days = Array.from(xml.getElementsByTagName("den"));
-            let dayData = days.find(node => possibleDates.includes(node.getAttribute("datum")));
+            
+            // Najdeme den, který odpovídá našemu cíli a MÁ v sobě položky
+            let dayData = days.find(node => {
+                const dateAttr = node.getAttribute("datum");
+                return searchDates.includes(dateAttr) && node.getElementsByTagName("polozka").length > 0;
+            });
 
-            // Pokud přesné datum nenajdeme, vezmeme první budoucí den, co v XML je
-            if (!dayData && days.length > 0) {
-                dayData = days.find(node => {
-                    const attr = node.getAttribute("datum");
-                    const [day, month, year] = attr.includes('-') ? attr.split('-') : attr.split('.');
-                    // Velmi hrubý test, zda je to budoucí datum
-                    return parseInt(day) >= parseInt(d) || parseInt(month) > parseInt(m);
-                }) || days[days.length - 1];
+            // Pokud jsme nic nenašli pro přesné datum, vezmeme PRVNÍ den z XML, který má jídla
+            if (!dayData) {
+                dayData = days.find(node => node.getElementsByTagName("polozka").length > 0);
             }
 
             if (!dayData) {
-                app.innerHTML = '<div class="status-msg">V systému Strava.cz aktuálně nejsou<br>nahraná žádná jídla.</div>';
-                label.innerText = "Menu není dostupné";
+                app.innerHTML = '<div class="status-msg">Aktuálně není k dispozici žádný jídelníček.</div>';
+                label.innerText = "Menu nenalezeno";
                 return;
             }
 
-            // Nastavení hezkého nadpisu podle nalezeného dne
-            const foundDateAttr = dayData.getAttribute("datum");
-            label.innerText = `Menu na ${foundDateAttr.replace(/-/g, '.')}`;
+            const foundDate = dayData.getAttribute("datum").replace(/-/g, '.');
+            label.innerText = `Menu na ${foundDate}`;
 
             const items = Array.from(dayData.getElementsByTagName("polozka"));
-            if (items.length === 0) {
-                app.innerHTML = '<div class="status-msg">Pro tento den je v jídelníčku prázdno.</div>';
-                return;
-            }
-
-            // Rozdělení jídla podle typu
-            const categories = {
-                "Polévka": items.filter(i => i.getAttribute("druh").toLowerCase().includes("pol")),
-                "Hlavní jídlo": items.filter(i => !i.getAttribute("druh").toLowerCase().includes("pol"))
-            };
+            
+            const polevky = items.filter(i => i.getAttribute("druh").toLowerCase().includes("pol"));
+            const hlavní = items.filter(i => !i.getAttribute("druh").toLowerCase().includes("pol"));
 
             let html = '';
-            for (const [title, dishes] of Object.entries(categories)) {
-                if (dishes.length > 0) {
-                    html += `<div class="section-title">${title}</div>`;
-                    dishes.forEach(dish => {
-                        const druh = dish.getAttribute("druh");
-                        const nazev = dish.getAttribute("nazev");
-                        const alergeny = dish.getAttribute("alergeny") ? dish.getAttribute("alergeny").split(',') : [];
-                        const tag = druh.split(' ').pop();
-                        const druhClean = druh.includes(' ') ? druh.substring(0, druh.lastIndexOf(' ')) : druh;
-
-                        html += `
-                            <div class="card">
-                                <div class="card-header">
-                                    <div class="tag">${tag}</div>
-                                    <div class="dish-name"><b>${druhClean} ${tag}</b> - ${nazev}</div>
-                                </div>
-                                <div class="meta">
-                                    <svg class="icon" viewBox="0 0 24 24"><path d="M21,3C21,3 15.8,3.5 12,7.2C10.1,9.1 8.8,11.4 8,14H4L2,16V17H4.5L5,17.5L5,20H6L8,18V14C10.6,13.2 12.9,11.9 14.8,10C18.5,6.2 19,1 19,1M14,6C14,5.4 14.4,5 15,5C15.6,5 16,5.4 16,6C16,6.6 15.6,7 15,7C14.4,7 14,6.6 14,6Z" /></svg>
-                                    <svg class="icon" viewBox="0 0 24 24"><path d="M19,19V17H5V19H19M19,7H5V15H19V7M18,3V5H6V3H18M21,15C21,16.1 20.1,17 19,17V15H21M3,15H5V17C3.9,17 3,16.1 3,15M21,7V9H19V7H21M3,7H5V9H3V7Z" /></svg>
-                                    <div class="allergens">${alergeny.map(a => `<span class="allergen-tag">${a.trim()}</span>`).join('')}</div>
-                                </div>
-                            </div>`;
-                    });
-                }
+            if (polevky.length > 0) {
+                html += '<div class="section-title">Polévka</div>';
+                polevky.forEach(i => html += renderDish(i));
             }
+            if (hlavní.length > 0) {
+                html += '<div class="section-title">Oběd</div>';
+                hlavní.forEach(i => html += renderDish(i));
+            }
+
             app.innerHTML = html;
+
         } catch (e) {
-            app.innerHTML = '<div class="status-msg">Chyba při načítání dat.<br>Zkuste to prosím za chvíli.</div>';
+            app.innerHTML = '<div class="status-msg">Chyba při stahování dat.</div>';
         }
+    }
+
+    function renderDish(item) {
+        const druh = item.getAttribute("druh") || "";
+        const nazev = item.getAttribute("nazev") || "";
+        const alergeny = item.getAttribute("alergeny") ? item.getAttribute("alergeny").split(',') : [];
+        const tag = druh.split(' ').pop();
+        const druhClean = druh.includes(' ') ? druh.substring(0, druh.lastIndexOf(' ')) : druh;
+
+        return `
+            <div class="card">
+                <div class="card-header">
+                    <div class="tag">${tag}</div>
+                    <div class="dish-name"><b>${druhClean} ${tag}</b> - ${nazev}</div>
+                </div>
+                <div class="meta">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M21,3C21,3 15.8,3.5 12,7.2C10.1,9.1 8.8,11.4 8,14H4L2,16V17H4.5L5,17.5L5,20H6L8,18V14C10.6,13.2 12.9,11.9 14.8,10C18.5,6.2 19,1 19,1M14,6C14,5.4 14.4,5 15,5C15.6,5 16,5.4 16,6C16,6.6 15.6,7 15,7C14.4,7 14,6.6 14,6Z" /></svg>
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M19,19V17H5V19H19M19,7H5V15H19V7M18,3V5H6V3H18M21,15C21,16.1 20.1,17 19,17V15H21M3,15H5V17C3.9,17 3,16.1 3,15M21,7V9H19V7H21M3,7H5V9H3V7Z" /></svg>
+                    <div class="allergens">${alergeny.map(a => `<span class="allergen-tag">${a.trim()}</span>`).join('')}</div>
+                </div>
+            </div>`;
     }
     init();
 </script>
