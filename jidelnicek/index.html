@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jídelníček Widget</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-widget: #3b2942; --bg-header: #4c2b4d; --bg-card: #231726;
+            --accent-pink: #ef91c5; --text-main: #f1d8e6; --text-dim: #9d8396;
+            --font-family: 'Nunito', sans-serif;
+        }
+        body, html { margin: 0; padding: 0; height: 100%; background: transparent; font-family: var(--font-family); color: var(--text-main); overflow: hidden; }
+        .widget { background: var(--bg-widget); border-radius: 28px; display: flex; flex-direction: column; height: 100vh; width: 100%; }
+        .header { background: var(--bg-header); padding: 16px 24px; display: flex; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .header-title { display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 700; }
+        .logo-img { width: 28px; height: 28px; object-fit: contain; }
+        .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; scroll-behavior: smooth; }
+        .section-title { color: var(--accent-pink); font-size: 0.9rem; margin: 20px 0 10px 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .card { background: var(--bg-card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+        .card-header { display: flex; gap: 12px; align-items: flex-start; }
+        .tag { background: var(--accent-pink); color: var(--bg-card); padding: 2px 6px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; min-width: 42px; text-align: center; flex-shrink: 0; }
+        .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 400; }
+        .dish-name b { color: var(--accent-pink); font-weight: 700; }
+        .meta { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+        .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; margin-right: 4px; }
+        .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
+        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); cursor: help; }
+        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+        .content::-webkit-scrollbar { width: 0; background: transparent; }
+    </style>
+</head>
+<body>
+<div class="widget">
+    <div class="header">
+        <div class="header-title">
+            <img src="https://app.strava.cz/logo/logomark.svg" class="logo-img" alt="Logo">
+            <span id="label">Načítám...</span>
+        </div>
+    </div>
+    <div class="content" id="app">
+        <div class="status-msg">Načítám data...</div>
+    </div>
+</div>
+
+<script>
+    const ALLERGENS_MAP = {
+        "01": "Obiloviny obsahující lepek", "1": "Obiloviny obsahující lepek", "02": "Korýši", "2": "Korýši", "03": "Vejce", "3": "Vejce",
+        "04": "Ryby", "4": "Ryby", "05": "Arašídy", "5": "Arašídy", "06": "Sójové boby (sója)", "6": "Sójové boby (sója)",
+        "07": "Mléko", "7": "Mléko", "08": "Skořápkové plody (ořechy)", "8": "Skořápkové plody (ořechy)",
+        "09": "Celer", "9": "Celer", "10": "Hořčice", "11": "Sezamová semena", "12": "Oxid siřičitý a siřičitany", "13": "Vlčí bob", "14": "Měkkýši"
+    };
+
+    function startAutoScroll() {
+        const container = document.getElementById('app');
+        let direction = 'down';
+        setInterval(() => {
+            const canScroll = container.scrollHeight > container.clientHeight;
+            if (canScroll) {
+                if (direction === 'down') {
+                    container.scrollTop = container.scrollHeight;
+                    direction = 'up';
+                } else {
+                    container.scrollTop = 0;
+                    direction = 'down';
+                }
+            }
+        }, 12000);
+    }
+
+    async function init() {
+        const app = document.getElementById('app');
+        const label = document.getElementById('label');
+        
+        // ZÍSKÁNÍ PARAMETRŮ Z URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const druhFilter = urlParams.get('Druh') ? urlParams.get('Druh').split(',').map(s => s.trim().toLowerCase()) : null;
+
+        try {
+            const res = await fetch('/api/menu');
+            const text = await res.text();
+
+            const now = new Date();
+            let target = new Date(now);
+            if (target.getDay() === 6) target.setDate(target.getDate() + 2);
+            else if (target.getDay() === 0) target.setDate(target.getDate() + 1);
+            else if (target.getDay() === 5 && now.getHours() >= 14) target.setDate(target.getDate() + 3);
+            else if (now.getHours() >= 14) target.setDate(target.getDate() + 1);
+
+            const d = String(target.getDate()).padStart(2, '0');
+            const m = String(target.getMonth() + 1).padStart(2, '0');
+            const y = target.getFullYear();
+            const dateStr = `${d}-${m}-${y}`;
+            label.innerText = `Menu na ${d}.${m}.${y}`;
+
+            const dayRegex = new RegExp(`<den[^>]*datum="${dateStr}"[^>]*>([\\s\\S]*?)<\\/den>`, 'i');
+            const dayMatch = text.match(dayRegex);
+
+            if (!dayMatch) {
+                app.innerHTML = `<div class="status-msg">Pro den ${d}.${m}.${y} není menu nahrané.</div>`;
+                return;
+            }
+
+            const jidloRegex = /<jidlo[^>]*nazev="([^"]*)"[^>]*druh="([^"]*)"(?:[^>]*alergeny="([^"]*)")?[^>]*\/>/gi;
+            let meals = [];
+            let match;
+            while ((match = jidloRegex.exec(dayMatch[1])) !== null) {
+                const nazev = match[1].trim();
+                const druh = match[2].trim();
+                const alergeny = match[3] || "";
+                
+                // LOGIKA FILTROVÁNÍ
+                if (druhFilter) {
+                    // Pokud je filtr nastaven, kontrolujeme, zda druh jídla obsahuje některý z požadovaných řetězců
+                    if (druhFilter.some(filter => druh.toLowerCase().includes(filter))) {
+                        meals.push({ nazev, druh, alergeny });
+                    }
+                } else {
+                    // Default: Polévky a Obědy
+                    if (druh.toLowerCase().includes("pol") || druh.toLowerCase().includes("oběd") || druh.toLowerCase().includes("obed")) {
+                        meals.push({ nazev, druh, alergeny });
+                    }
+                }
+            }
+
+            if (meals.length === 0) {
+                app.innerHTML = '<div class="status-msg">Žádná jídla k zobrazení.</div>';
+                return;
+            }
+
+            // Rozdělení do kategorií pro zobrazení
+            const polevky = meals.filter(m => m.druh.toLowerCase().includes("pol"));
+            const obedy = meals.filter(m => !m.druh.toLowerCase().includes("pol"));
+
+            let html = '';
+            if (polevky.length > 0) {
+                html += '<div class="section-title">Polévka</div>';
+                polevky.forEach(m => html += renderMeal(m));
+            }
+            if (obedy.length > 0) {
+                html += '<div class="section-title">Oběd</div>';
+                obedy.forEach(m => html += renderMeal(m));
+            }
+            app.innerHTML = html;
+            startAutoScroll();
+
+        } catch (e) {
+            app.innerHTML = `<div class="status-msg">Chyba připojení k API.</div>`;
+        }
+    }
+
+    function renderMeal(m) {
+        const tag = m.druh.split(' ').filter(x => x).pop();
+        const baseName = m.druh.substring(0, m.druh.lastIndexOf(tag)).trim();
+        let allergensHtml = '';
+        if (m.alergeny) {
+            const list = m.alergeny.split(',').map(a => a.trim());
+            allergensHtml = list.map(code => {
+                const cleanCode = code.split(' ')[0];
+                return `<span class="allergen-tag" title="${ALLERGENS_MAP[cleanCode] || 'Alergen'}">${cleanCode}</span>`;
+            }).join('');
+        }
+        return `
+            <div class="card">
+                <div class="card-header">
+                    <div class="tag">${tag}</div>
+                    <div class="dish-name"><b>${baseName} ${tag}</b> - ${m.nazev}</div>
+                </div>
+                ${allergensHtml ? `<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">${allergensHtml}</div></div>` : ''}
+            </div>`;
+    }
+    init();
+</script>
+</body>
+</html>
