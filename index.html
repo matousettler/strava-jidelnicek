@@ -4,26 +4,146 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jídelníček Widget</title>
+    <!-- Import fontu Nunito -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-widget: #3b2942; --bg-header: #4c2b4d; --bg-card: #231726;
-            --accent-pink: #ef91c5; --text-main: #f1d8e6; --text-dim: #9d8396;
+            --bg-widget: #3b2942; 
+            --bg-header: #4c2b4d; 
+            --bg-card: #231726;
+            --accent-pink: #ef91c5; 
+            --text-main: #f1d8e6; 
+            --text-dim: #9d8396;
+            --font-family: 'Nunito', sans-serif;
         }
-        body, html { margin: 0; padding: 0; height: 100%; background: transparent; font-family: 'Segoe UI', sans-serif; color: var(--text-main); overflow: hidden; }
-        .widget { background: var(--bg-widget); border-radius: 28px; display: flex; flex-direction: column; height: 100vh; border: 1px solid rgba(255,255,255,0.05); }
-        .header { background: var(--bg-header); padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .header-title { display: flex; align-items: center; gap: 12px; font-size: 1.2rem; font-weight: 600; }
-        .flower { color: var(--accent-pink); font-size: 1.5rem; }
-        .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; }
-        .section-title { color: var(--accent-pink); font-size: 0.9rem; margin: 20px 0 10px 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-        .card { background: var(--bg-card); border-radius: 12px; padding: 15px; margin-bottom: 12px; }
-        .card-header { display: flex; gap: 12px; align-items: flex-start; }
-        .tag { background: var(--accent-pink); color: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-weight: 800; font-size: 0.75rem; min-width: 40px; text-align: center; flex-shrink: 0; }
-        .dish-name { line-height: 1.4; font-size: 0.95rem; }
-        .dish-name b { color: var(--accent-pink); font-weight: 600; }
-        .meta { display: flex; align-items: center; gap: 10px; margin-top: 10px; opacity: 0.5; }
-        .icon { width: 14px; height: 14px; fill: currentColor; }
-        .allergen-tag { font-size: 0.65rem; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); margin-right: 3px; }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100%; 
+            background: transparent; 
+            font-family: var(--font-family); 
+            color: var(--text-main); 
+            overflow: hidden; 
+        }
+
+        .widget { 
+            background: var(--bg-widget); 
+            border-radius: 28px; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            width: 100%; 
+        }
+
+        .header { 
+            background: var(--bg-header); 
+            padding: 16px 24px; 
+            display: flex; 
+            align-items: center; 
+            flex-shrink: 0; 
+        }
+
+        .header-title { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            font-size: 1.3rem; 
+            font-weight: 700; 
+        }
+
+        .logo-img { 
+            width: 28px; 
+            height: 28px; 
+            object-fit: contain;
+        }
+
+        .content { 
+            padding: 10px 20px 20px 20px; 
+            overflow-y: auto; 
+            flex-grow: 1; 
+        }
+
+        .section-title { 
+            color: var(--accent-pink); 
+            font-size: 0.9rem; 
+            margin: 20px 0 10px 4px; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+        }
+
+        .card { 
+            background: var(--bg-card); 
+            border-radius: 14px; 
+            padding: 16px; 
+            margin-bottom: 12px; 
+        }
+
+        .card-header { 
+            display: flex; 
+            gap: 12px; 
+            align-items: flex-start; 
+        }
+
+        .tag { 
+            background: var(--accent-pink); 
+            color: var(--bg-card); 
+            padding: 2px 6px; 
+            border-radius: 6px; 
+            font-weight: 800; 
+            font-size: 0.75rem; 
+            min-width: 42px; 
+            text-align: center; 
+            flex-shrink: 0; 
+        }
+
+        .dish-name { 
+            line-height: 1.4; 
+            font-size: 1rem; 
+            font-weight: 400;
+        }
+
+        .dish-name b { 
+            color: var(--accent-pink); 
+            font-weight: 700; 
+        }
+
+        .meta { 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            margin-top: 12px; 
+        }
+
+        .allergen-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-weight: 600;
+            margin-right: 4px;
+        }
+
+        .allergens {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .allergen-tag { 
+            font-size: 0.7rem; 
+            background: rgba(255,255,255,0.06); 
+            color: var(--text-dim);
+            padding: 1px 6px; 
+            border-radius: 6px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            cursor: help;
+            transition: all 0.2s;
+        }
+
+        .allergen-tag:hover {
+            background: var(--accent-pink);
+            color: var(--bg-card);
+            border-color: var(--accent-pink);
+        }
+
         .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
         .content::-webkit-scrollbar { width: 5px; }
         .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -32,13 +152,35 @@
 <body>
 <div class="widget">
     <div class="header">
-        <div class="header-title"><span class="flower">✿</span><span id="label">Načítám...</span></div>
-        <div class="dots" style="color:var(--text-dim); letter-spacing:2px">● ● ●</div>
+        <div class="header-title">
+            <img src="https://app.strava.cz/logo/logomark.svg" class="logo-img" alt="Logo">
+            <span id="label">Načítám menu...</span>
+        </div>
     </div>
-    <div class="content" id="app"><div class="status-msg">Hledám pondělní menu...</div></div>
+    <div class="content" id="app">
+        <div class="status-msg">Připravuji dnešní nabídku...</div>
+    </div>
 </div>
 
 <script>
+    // Seznam alergenů pro tooltipy
+    const ALLERGENS_MAP = {
+        "01": "Obiloviny obsahující lepek", "1": "Obiloviny obsahující lepek",
+        "02": "Korýši", "2": "Korýši",
+        "03": "Vejce", "3": "Vejce",
+        "04": "Ryby", "4": "Ryby",
+        "05": "Arašídy", "5": "Arašídy",
+        "06": "Sójové boby (sója)", "6": "Sójové boby (sója)",
+        "07": "Mléko", "7": "Mléko",
+        "08": "Skořápkové plody (ořechy)", "8": "Skořápkové plody (ořechy)",
+        "09": "Celer", "9": "Celer",
+        "10": "Hořčice",
+        "11": "Sezamová semena",
+        "12": "Oxid siřičitý a siřičitany",
+        "13": "Vlčí bob (lupina)",
+        "14": "Měkkýši"
+    };
+
     async function init() {
         const app = document.getElementById('app');
         const label = document.getElementById('label');
@@ -47,48 +189,44 @@
             const res = await fetch('/api/menu');
             const text = await res.text();
 
-            // LOGIKA DATUMU (Hledáme 16-03-2026)
             const now = new Date();
             let target = new Date(now);
-            if (target.getDay() === 6) target.setDate(target.getDate() + 2); // So -> Po
-            else if (target.getDay() === 0) target.setDate(target.getDate() + 1); // Ne -> Po
-            else if (target.getDay() === 5 && now.getHours() >= 14) target.setDate(target.getDate() + 3); // Pá po 14h -> Po
+            
+            // Logika víkendu a 14:00
+            if (target.getDay() === 6) target.setDate(target.getDate() + 2);
+            else if (target.getDay() === 0) target.setDate(target.getDate() + 1);
+            else if (target.getDay() === 5 && now.getHours() >= 14) target.setDate(target.getDate() + 3);
             else if (now.getHours() >= 14) target.setDate(target.getDate() + 1);
 
             const d = String(target.getDate()).padStart(2, '0');
             const m = String(target.getMonth() + 1).padStart(2, '0');
             const y = target.getFullYear();
-            const dateStr = `${d}-${m}-${y}`; // Formát DD-MM-YYYY podle vašeho XML
+            const dateStr = `${d}-${m}-${y}`;
             
-            label.innerText = `Menu na ${dateStr.replace(/-/g, '.')}`;
+            label.innerText = `Menu na ${d}.${m}.${y}`;
 
-            // EXTRAKCE BLOKU DNE
             const dayRegex = new RegExp(`<den[^>]*datum="${dateStr}"[^>]*>([\\s\\S]*?)<\\/den>`, 'i');
             const dayMatch = text.match(dayRegex);
 
             if (!dayMatch) {
-                app.innerHTML = `<div class="status-msg">Pro den ${dateStr} není menu v API nahrané.</div>`;
+                app.innerHTML = `<div class="status-msg">Pro den ${d}.${m}.${y} není menu dostupné.</div>`;
                 return;
             }
 
-            // EXTRAKCE JÍDEL (Značka je <jidlo ... />)
             const jidloRegex = /<jidlo[^>]*nazev="([^"]*)"[^>]*druh="([^"]*)"(?:[^>]*alergeny="([^"]*)")?[^>]*\/>/gi;
-            
             let meals = [];
             let match;
             while ((match = jidloRegex.exec(dayMatch[1])) !== null) {
                 const nazev = match[1].trim();
                 const druh = match[2].trim();
                 const alergeny = match[3] || "";
-                
-                // Filtrujeme pouze Polévky a Obědy (ignorujeme Svačiny a Přesnídávky)
                 if (druh.toLowerCase().includes("pol") || druh.toLowerCase().includes("oběd") || druh.toLowerCase().includes("obed")) {
                     meals.push({ nazev, druh, alergeny });
                 }
             }
 
             if (meals.length === 0) {
-                app.innerHTML = '<div class="status-msg">V jídelníčku pro tento den zatím nic není.</div>';
+                app.innerHTML = '<div class="status-msg">V jídelníčku pro tento den nejsou žádná jídla.</div>';
                 return;
             }
 
@@ -112,10 +250,19 @@
     }
 
     function renderMeal(m) {
-        // Získání tagu (poslední slovo z "druhu", např. "P1" z "Oběd P1")
         const tag = m.druh.split(' ').filter(x => x).pop();
         const baseName = m.druh.substring(0, m.druh.lastIndexOf(tag)).trim();
-        const allergensHtml = m.alergeny ? m.alergeny.split(',').map(a => `<span class="allergen-tag">${a.trim().split(' ')[0]}</span>`).join('') : '';
+        
+        // Zpracování alergenů do tagů s tooltipem
+        let allergensHtml = '';
+        if (m.alergeny) {
+            const list = m.alergeny.split(',').map(a => a.trim());
+            allergensHtml = list.map(code => {
+                const cleanCode = code.split(' ')[0]; // Ošetření případného textu za číslem
+                const name = ALLERGENS_MAP[cleanCode] || "Neznámý alergen";
+                return `<span class="allergen-tag" title="${name}">${cleanCode}</span>`;
+            }).join('');
+        }
 
         return `
             <div class="card">
@@ -123,11 +270,11 @@
                     <div class="tag">${tag}</div>
                     <div class="dish-name"><b>${baseName} ${tag}</b> - ${m.nazev}</div>
                 </div>
+                ${allergensHtml ? `
                 <div class="meta">
-                    <svg class="icon" viewBox="0 0 24 24"><path d="M21,3C21,3 15.8,3.5 12,7.2C10.1,9.1 8.8,11.4 8,14H4L2,16V17H4.5L5,17.5L5,20H6L8,18V14C10.6,13.2 12.9,11.9 14.8,10C18.5,6.2 19,1 19,1M14,6C14,5.4 14.4,5 15,5C15.6,5 16,5.4 16,6C16,6.6 15.6,7 15,7C14.4,7 14,6.6 14,6Z" /></svg>
-                    <svg class="icon" viewBox="0 0 24 24"><path d="M19,19V17H5V19H19M19,7H5V15H19V7M18,3V5H6V3H18M21,15C21,16.1 20.1,17 19,17V15H21M3,15H5V17C3.9,17 3,16.1 3,15M21,7V9H19V7H21M3,7H5V9H3V7Z" /></svg>
+                    <span class="allergen-label">Alergeny:</span>
                     <div class="allergens">${allergensHtml}</div>
-                </div>
+                </div>` : ''}
             </div>`;
     }
     init();
