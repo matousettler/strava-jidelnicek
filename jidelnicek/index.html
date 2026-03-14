@@ -17,7 +17,7 @@
         .header-title { display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 700; }
         .logo-img { width: 28px; height: 28px; object-fit: contain; }
         .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; scroll-behavior: smooth; }
-        .section-title { color: var(--accent-pink); font-size: 0.9rem; margin: 20px 0 10px 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .section-title { color: var(--accent-pink); font-size: 0.9rem; margin: 25px 0 10px 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
         .card { background: var(--bg-card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
         .card-header { display: flex; gap: 12px; align-items: flex-start; }
         .tag { background: var(--accent-pink); color: var(--bg-card); padding: 2px 6px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; min-width: 42px; text-align: center; flex-shrink: 0; }
@@ -40,7 +40,7 @@
         </div>
     </div>
     <div class="content" id="app">
-        <div class="status-msg">Načítám data...</div>
+        <div class="status-msg">Načítám data z jídelny...</div>
     </div>
 </div>
 
@@ -73,7 +73,6 @@
         const app = document.getElementById('app');
         const label = document.getElementById('label');
         
-        // ZÍSKÁNÍ PARAMETRŮ Z URL
         const urlParams = new URLSearchParams(window.location.search);
         const druhFilter = urlParams.get('Druh') ? urlParams.get('Druh').split(',').map(s => s.trim().toLowerCase()) : null;
 
@@ -110,17 +109,9 @@
                 const druh = match[2].trim();
                 const alergeny = match[3] || "";
                 
-                // LOGIKA FILTROVÁNÍ
-                if (druhFilter) {
-                    // Pokud je filtr nastaven, kontrolujeme, zda druh jídla obsahuje některý z požadovaných řetězců
-                    if (druhFilter.some(filter => druh.toLowerCase().includes(filter))) {
-                        meals.push({ nazev, druh, alergeny });
-                    }
-                } else {
-                    // Default: Polévky a Obědy
-                    if (druh.toLowerCase().includes("pol") || druh.toLowerCase().includes("oběd") || druh.toLowerCase().includes("obed")) {
-                        meals.push({ nazev, druh, alergeny });
-                    }
+                // Pokud není filtr, bereme vše. Pokud je filtr, kontrolujeme ho.
+                if (!druhFilter || druhFilter.some(f => druh.toLowerCase().includes(f))) {
+                    meals.push({ nazev, druh, alergeny });
                 }
             }
 
@@ -129,18 +120,36 @@
                 return;
             }
 
-            // Rozdělení do kategorií pro zobrazení
-            const polevky = meals.filter(m => m.druh.toLowerCase().includes("pol"));
-            const obedy = meals.filter(m => !m.druh.toLowerCase().includes("pol"));
+            // Dynamické seskupení podle základu "druhu" (vše před posledním tagem)
+            const grouped = {};
+            meals.forEach(m => {
+                const tag = m.druh.split(' ').filter(x => x).pop();
+                const baseName = m.druh.substring(0, m.druh.lastIndexOf(tag)).trim() || m.druh;
+                if (!grouped[baseName]) grouped[baseName] = [];
+                grouped[baseName].push({...m, tag, baseName});
+            });
 
             let html = '';
-            if (polevky.length > 0) {
-                html += '<div class="section-title">Polévka</div>';
-                polevky.forEach(m => html += renderMeal(m));
-            }
-            if (obedy.length > 0) {
-                html += '<div class="section-title">Oběd</div>';
-                obedy.forEach(m => html += renderMeal(m));
+            for (const section in grouped) {
+                html += `<div class="section-title">${section}</div>`;
+                grouped[section].forEach(m => {
+                    let allergensHtml = '';
+                    if (m.alergeny) {
+                        const list = m.alergeny.split(',').map(a => a.trim());
+                        allergensHtml = list.map(code => {
+                            const cleanCode = code.split(' ')[0];
+                            return `<span class="allergen-tag" title="${ALLERGENS_MAP[cleanCode] || 'Alergen'}">${cleanCode}</span>`;
+                        }).join('');
+                    }
+                    html += `
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="tag">${m.tag}</div>
+                                <div class="dish-name"><b>${m.baseName} ${m.tag}</b> - ${m.nazev}</div>
+                            </div>
+                            ${allergensHtml ? `<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">${allergensHtml}</div></div>` : ''}
+                        </div>`;
+                });
             }
             app.innerHTML = html;
             startAutoScroll();
@@ -148,27 +157,6 @@
         } catch (e) {
             app.innerHTML = `<div class="status-msg">Chyba připojení k API.</div>`;
         }
-    }
-
-    function renderMeal(m) {
-        const tag = m.druh.split(' ').filter(x => x).pop();
-        const baseName = m.druh.substring(0, m.druh.lastIndexOf(tag)).trim();
-        let allergensHtml = '';
-        if (m.alergeny) {
-            const list = m.alergeny.split(',').map(a => a.trim());
-            allergensHtml = list.map(code => {
-                const cleanCode = code.split(' ')[0];
-                return `<span class="allergen-tag" title="${ALLERGENS_MAP[cleanCode] || 'Alergen'}">${cleanCode}</span>`;
-            }).join('');
-        }
-        return `
-            <div class="card">
-                <div class="card-header">
-                    <div class="tag">${tag}</div>
-                    <div class="dish-name"><b>${baseName} ${tag}</b> - ${m.nazev}</div>
-                </div>
-                ${allergensHtml ? `<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">${allergensHtml}</div></div>` : ''}
-            </div>`;
     }
     init();
 </script>
