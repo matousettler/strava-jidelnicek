@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jídelníček</title>
+    <style>
+        :root {
+            --bg-deep: #0e0a12;
+            --bg-widget: #2a1b2d;
+            --bg-header: #4c2b4d;
+            --bg-card: #1d121f;
+            --accent-pink: #ef91c5;
+            --text-main: #f1d8e6;
+            --text-dim: #9d8396;
+            --font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100%; 
+            background-color: transparent; /* Aby splynul s webem */
+            font-family: var(--font-family);
+            color: var(--text-main);
+        }
+
+        .widget {
+            background-color: var(--bg-widget);
+            border-radius: 28px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 100%;
+        }
+
+        .header {
+            background-color: var(--bg-header);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .flower { color: var(--accent-pink); font-size: 1.6rem; }
+        .dots { color: var(--text-dim); letter-spacing: 2px; font-weight: bold; }
+
+        .content {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .section-title {
+            color: var(--accent-pink);
+            font-size: 1.1rem;
+            margin: 15px 0 10px 4px;
+            font-weight: 500;
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 0px solid var(--accent-pink);
+        }
+
+        .card-header {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .tag {
+            background-color: var(--accent-pink);
+            color: var(--bg-card);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 800;
+            font-size: 0.85rem;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .dish-name { line-height: 1.4; font-size: 1rem; }
+        .dish-name b { color: var(--accent-pink); font-weight: 600; }
+
+        .meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 12px;
+            opacity: 0.6;
+        }
+
+        .icon { width: 16px; height: 16px; fill: currentColor; }
+
+        .allergens {
+            display: flex;
+            gap: 6px;
+        }
+
+        .allergen-tag {
+            font-size: 0.75rem;
+            background: rgba(255,255,255,0.05);
+            padding: 1px 6px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Scrollbar styling */
+        .content::-webkit-scrollbar { width: 6px; }
+        .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .loading { text-align: center; padding: 50px; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+
+<div class="widget">
+    <div class="header">
+        <div class="header-title">
+            <span class="flower">✿</span>
+            <span id="label">Dnešní Menu</span>
+        </div>
+        <div class="dots">...</div>
+    </div>
+    <div class="content" id="app">
+        <div class="loading">Načítám jídelníček...</div>
+    </div>
+</div>
+
+<script>
+    async function init() {
+        const app = document.getElementById('app');
+        const label = document.getElementById('label');
+
+        try {
+            const res = await fetch('/api/menu');
+            const xmlText = await res.text();
+            const xml = new DOMParser().parseFromString(xmlText, "text/xml");
+
+            const now = new Date();
+            let targetDate = new Date(now);
+
+            // Logika přepínání: po 14:00 na další den
+            if (now.getHours() >= 14) {
+                targetDate.setDate(targetDate.getDate() + 1);
+            }
+
+            // Víkendová logika (Pátek odpoledne/So/Ne -> Pondělí)
+            if (targetDate.getDay() === 6) targetDate.setDate(targetDate.getDate() + 2);
+            if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
+
+            const dateStr = targetDate.toISOString().split('T')[0];
+            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+            label.innerText = isToday ? 'Dnešní Menu' : 'Menu na zítra';
+
+            const days = xml.getElementsByTagName("den");
+            let dayData = Array.from(days).find(d => d.getAttribute("datum") === dateStr);
+
+            if (!dayData) {
+                app.innerHTML = '<div class="loading">Jídelníček pro tento den nebyl nalezen.</div>';
+                return;
+            }
+
+            const items = Array.from(dayData.getElementsByTagName("polozka"));
+            const polevky = items.filter(i => i.getAttribute("druh").toLowerCase().includes("polévka"));
+            const obedy = items.filter(i => i.getAttribute("druh").toLowerCase().includes("oběd"));
+
+            let html = '';
+
+            if (polevky.length > 0) {
+                html += '<div class="section-title">Polévka</div>';
+                polevky.forEach(i => html += renderItem(i));
+            }
+
+            if (obedy.length > 0) {
+                html += '<div class="section-title">Oběd</div>';
+                obedy.forEach(i => html += renderItem(i));
+            }
+
+            app.innerHTML = html;
+
+        } catch (e) {
+            app.innerHTML = '<div class="loading">Nepodařilo se načíst data.</div>';
+        }
+    }
+
+    function renderItem(item) {
+        const druh = item.getAttribute("druh");
+        const nazev = item.getAttribute("nazev");
+        const alergeny = item.getAttribute("alergeny") ? item.getAttribute("alergeny").split(',') : [];
+        
+        const tag = druh.split(' ').pop();
+        const druhName = druh.substring(0, druh.lastIndexOf(" "));
+
+        return `
+            <div class="card">
+                <div class="card-header">
+                    <div class="tag">${tag}</div>
+                    <div class="dish-name"><b>${druhName} ${tag}</b> - ${nazev}</div>
+                </div>
+                <div class="meta">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M21,3C21,3 15.8,3.5 12,7.2C10.1,9.1 8.8,11.4 8,14H4L2,16V17H4.5L5,17.5L5,20H6L8,18V14C10.6,13.2 12.9,11.9 14.8,10C18.5,6.2 19,1 19,1M14,6C14,5.4 14.4,5 15,5C15.6,5 16,5.4 16,6C16,6.6 15.6,7 15,7C14.4,7 14,6.6 14,6Z" /></svg>
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M19,19V17H5V19H19M19,7H5V15H19V7M18,3V5H6V3H18M21,15C21,16.1 20.1,17 19,17V15H21M3,15H5V17C3.9,17 3,16.1 3,15M21,7V9H19V7H21M3,7H5V9H3V7Z" /></svg>
+                    <div class="allergens">${alergeny.map(a => `<span class="allergen-tag">${a.trim()}</span>`).join('')}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    init();
+</script>
+</body>
+</html>
