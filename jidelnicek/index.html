@@ -45,18 +45,18 @@
 </div>
 
 <script>
-    const ALLERGENS_MAP = {
-        "01": "Obiloviny obsahující lepek", "1": "Obiloviny obsahující lepek", "02": "Korýši", "2": "Korýši", "03": "Vejce", "3": "Vejce",
-        "04": "Ryby", "4": "Ryby", "05": "Arašídy", "5": "Arašídy", "06": "Sójové boby (sója)", "6": "Sójové boby (sója)",
-        "07": "Mléko", "7": "Mléko", "08": "Skořápkové plody (ořechy)", "8": "Skořápkové plody (ořechy)",
-        "09": "Celer", "9": "Celer", "10": "Hořčice", "11": "Sezamová semena", "12": "Oxid siřičitý a siřičitany", "13": "Vlčí bob", "14": "Měkkýši"
+    var ALLERGENS_MAP = {
+        "01": "Obiloviny s lepkem", "1": "Obiloviny s lepkem", "02": "Korýši", "2": "Korýši", "03": "Vejce", "3": "Vejce",
+        "04": "Ryby", "4": "Ryby", "05": "Arašídy", "5": "Arašídy", "06": "Sója", "6": "Sója", "07": "Mléko", "7": "Mléko",
+        "08": "Ořechy", "8": "Ořechy", "09": "Celer", "9": "Celer", "10": "Hořčice", "11": "Sezam", "12": "Siřičitany", 
+        "13": "Vlčí bob", "14": "Měkkýši"
     };
 
     function startAutoScroll() {
-        const container = document.getElementById('app');
-        let direction = 'down';
-        setInterval(() => {
-            const canScroll = container.scrollHeight > container.clientHeight;
+        var container = document.getElementById('app');
+        var direction = 'down';
+        setInterval(function() {
+            var canScroll = container.scrollHeight > container.clientHeight;
             if (canScroll) {
                 if (direction === 'down') {
                     container.scrollTop = container.scrollHeight;
@@ -70,48 +70,70 @@
     }
 
     async function init() {
-        const app = document.getElementById('app');
-        const label = document.getElementById('label');
+        var app = document.getElementById('app');
+        var label = document.getElementById('label');
         
-        const urlParams = new URLSearchParams(window.location.search);
-        const druhFilter = urlParams.get('Druh') ? urlParams.get('Druh').split(',').map(s => s.trim().toLowerCase()) : null;
+        var urlParams = new URLSearchParams(window.location.search);
+        var filterParam = urlParams.get('Druh');
+        var druhFilter = filterParam ? filterParam.split(',').map(function(s){ return s.trim().toLowerCase(); }) : null;
 
         try {
-            const res = await fetch('/api/menu');
-            const text = await res.text();
+            var res = await fetch('/api/menu');
+            var xmlText = await res.text();
+            var parser = new DOMParser();
+            var xmlDoc = parser.parseFromString(xmlText, "text/xml");
 
-            const now = new Date();
-            let target = new Date(now);
+            // LOGIKA DATUMU
+            var now = new Date();
+            var target = new Date(now.getTime());
             if (target.getDay() === 6) target.setDate(target.getDate() + 2);
             else if (target.getDay() === 0) target.setDate(target.getDate() + 1);
             else if (target.getDay() === 5 && now.getHours() >= 14) target.setDate(target.getDate() + 3);
             else if (now.getHours() >= 14) target.setDate(target.getDate() + 1);
 
-            const d = String(target.getDate()).padStart(2, '0');
-            const m = String(target.getMonth() + 1).padStart(2, '0');
-            const y = target.getFullYear();
-            const dateStr = `${d}-${m}-${y}`;
-            label.innerText = `Menu na ${d}.${m}.${y}`;
+            var d = String(target.getDate()).padStart(2, '0');
+            var m = String(target.getMonth() + 1).padStart(2, '0');
+            var y = target.getFullYear();
+            
+            var searchStr1 = d + "-" + m + "-" + y;
+            var searchStr2 = d + "." + m + "." + y;
 
-            const dayRegex = new RegExp(`<den[^>]*datum="${dateStr}"[^>]*>([\\s\\S]*?)<\\/den>`, 'i');
-            const dayMatch = text.match(dayRegex);
+            var days = xmlDoc.getElementsByTagName("den");
+            var dayData = null;
 
-            if (!dayMatch) {
-                app.innerHTML = `<div class="status-msg">Pro den ${d}.${m}.${y} není menu nahrané.</div>`;
+            // Hledání dne v XML přes atribut datum
+            for (var i = 0; i < days.length; i++) {
+                var attr = days[i].getAttribute("datum");
+                if (attr === searchStr1 || attr === searchStr2) {
+                    dayData = days[i];
+                    break;
+                }
+            }
+
+            // FALLBACK PRO AMOS: Pokud den nenajdeme, vezmeme první dostupný budoucí den
+            if (!dayData && days.length > 0) {
+                dayData = days[0];
+                var fallbackAttr = dayData.getAttribute("datum").replace(/-/g, '.');
+                label.innerText = "Menu na " + fallbackAttr;
+            } else {
+                label.innerText = "Menu na " + d + "." + m + "." + y;
+            }
+
+            if (!dayData) {
+                app.innerHTML = '<div class="status-msg">Momentálně není v systému žádný jídelníček.</div>';
                 return;
             }
 
-            const jidloRegex = /<jidlo[^>]*nazev="([^"]*)"[^>]*druh="([^"]*)"(?:[^>]*alergeny="([^"]*)")?[^>]*\/>/gi;
-            let meals = [];
-            let match;
-            while ((match = jidloRegex.exec(dayMatch[1])) !== null) {
-                const nazev = match[1].trim();
-                const druh = match[2].trim();
-                const alergeny = match[3] || "";
+            var items = dayData.getElementsByTagName("jidlo");
+            var meals = [];
+
+            for (var j = 0; j < items.length; j++) {
+                var nazev = items[j].getAttribute("nazev");
+                var druh = items[j].getAttribute("druh");
+                var alergeny = items[j].getAttribute("alergeny") || "";
                 
-                // Pokud není filtr, bereme vše. Pokud je filtr, kontrolujeme ho.
-                if (!druhFilter || druhFilter.some(f => druh.toLowerCase().includes(f))) {
-                    meals.push({ nazev, druh, alergeny });
+                if (!druhFilter || druhFilter.some(function(f){ return druh.toLowerCase().indexOf(f) !== -1; })) {
+                    meals.push({ nazev: nazev, druh: druh, alergeny: alergeny });
                 }
             }
 
@@ -120,42 +142,36 @@
                 return;
             }
 
-            // Dynamické seskupení podle základu "druhu" (vše před posledním tagem)
-            const grouped = {};
-            meals.forEach(m => {
-                const tag = m.druh.split(' ').filter(x => x).pop();
-                const baseName = m.druh.substring(0, m.druh.lastIndexOf(tag)).trim() || m.druh;
+            // Seskupení
+            var grouped = {};
+            meals.forEach(function(m) {
+                var parts = m.druh.split(' ');
+                var tag = parts.length > 1 ? parts.pop() : "";
+                var baseName = parts.join(' ').trim() || m.druh;
                 if (!grouped[baseName]) grouped[baseName] = [];
-                grouped[baseName].push({...m, tag, baseName});
+                grouped[baseName].push({ nazev: m.nazev, tag: tag, baseName: baseName, alergeny: m.alergeny });
             });
 
-            let html = '';
-            for (const section in grouped) {
-                html += `<div class="section-title">${section}</div>`;
-                grouped[section].forEach(m => {
-                    let allergensHtml = '';
+            var html = '';
+            for (var section in grouped) {
+                html += '<div class="section-title">' + section + '</div>';
+                grouped[section].forEach(function(m) {
+                    var allergensHtml = '';
                     if (m.alergeny) {
-                        const list = m.alergeny.split(',').map(a => a.trim());
-                        allergensHtml = list.map(code => {
-                            const cleanCode = code.split(' ')[0];
-                            return `<span class="allergen-tag" title="${ALLERGENS_MAP[cleanCode] || 'Alergen'}">${cleanCode}</span>`;
+                        var list = m.alergeny.split(',');
+                        allergensHtml = list.map(function(code) {
+                            var clean = code.trim().split(' ')[0];
+                            return '<span class="allergen-tag" title="' + (ALLERGENS_MAP[clean] || 'Alergen') + '">' + clean + '</span>';
                         }).join('');
                     }
-                    html += `
-                        <div class="card">
-                            <div class="card-header">
-                                <div class="tag">${m.tag}</div>
-                                <div class="dish-name"><b>${m.baseName} ${m.tag}</b> - ${m.nazev}</div>
-                            </div>
-                            ${allergensHtml ? `<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">${allergensHtml}</div></div>` : ''}
-                        </div>`;
+                    html += '<div class="card"><div class="card-header"><div class="tag">' + m.tag + '</div><div class="dish-name"><b>' + m.baseName + ' ' + m.tag + '</b> - ' + m.nazev + '</div></div>' + (allergensHtml ? '<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">' + allergensHtml + '</div></div>' : '') + '</div>';
                 });
             }
             app.innerHTML = html;
             startAutoScroll();
 
         } catch (e) {
-            app.innerHTML = `<div class="status-msg">Chyba připojení k API.</div>`;
+            app.innerHTML = '<div class="status-msg">Chyba: ' + e.message + '</div>';
         }
     }
     init();
