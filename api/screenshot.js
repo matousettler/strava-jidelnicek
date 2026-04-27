@@ -16,6 +16,7 @@ export default async function handler(req) {
     delay: 0,
     timeout: 60,
     response_type: 'by_format',
+    styles: 'body%20%7B%0Apadding-top%3A%20100px%3B%0A%7D',
     full_page: true,
     image_quality: 80,
   });
