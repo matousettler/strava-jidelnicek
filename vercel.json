@@ -1,5 +1,13 @@
 {
-  "rewrites": [
-    { "source": "/api/menu", "destination": "/api/menu.js" }
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Accept-CH",
+          "value": ""
+        }
+      ]
+    }
   ]
 }
