@@ -1,11 +1,38 @@
-<body style="margin:0; background:black; overflow:hidden;">
-    <img id="padletImg" src="https://api.screenshotmachine.com/?key=9b8e2a&url=https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl&dimension=1920x1080&device=desktop&format=png" style="width:100vw; height:100vh; object-fit: contain;">
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Padlet Nástěnka</title>
+    <style>
+        /* Odstraní okraje stránky a zajistí, že se obsah nebude hýbat */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden; /* Zabrání dvojitému skrolování */
+        }
 
-    <script>
-        // Každých 15 minut obrázek aktualizuje, aby tam byly nové zprávy
-        setInterval(function(){
-            var img = document.getElementById('padletImg');
-            img.src = img.src.split('&ts=')[0] + '&ts=' + new Date().getTime();
-        }, 900000);
-    </script>
+        /* Roztáhne iframe na celou obrazovku */
+        iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <iframe 
+        src="api/proxy" 
+        allow="camera;microphone;geolocation;display-capture;clipboard-write"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+        allowfullscreen>
+</iframe>
+
 </body>
+</html>
