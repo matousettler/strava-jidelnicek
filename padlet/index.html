@@ -10,23 +10,68 @@
             padding: 0;
             height: 100%;
             width: 100%;
+            background: #000;
             overflow: hidden;
         }
-        iframe {
+        img {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            border: none;
+            object-fit: contain;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: sans-serif;
+            font-size: 18px;
         }
     </style>
 </head>
 <body>
-    <iframe 
-        src="/api/padlet"
-        allow="camera;microphone;geolocation;display-capture;clipboard-write"
-        allowfullscreen>
-    </iframe>
+    <div id="loading">Načítám nástěnku...</div>
+    <img id="screenshot" alt="Padlet nástěnka" />
+
+    <script>
+        // Zaokrouhlí čas na aktuální hodinu → nový screenshot max 1× za hodinu
+        function getHourlyTimestamp() {
+            const now = new Date();
+            now.setMinutes(0, 0, 0);
+            return now.getTime();
+        }
+
+        function loadScreenshot() {
+            const padletUrl = encodeURIComponent('https://padlet.com/embed/xet6al33uutzs6wl');
+            const ts = getHourlyTimestamp();
+            
+            // Thum.io — 1000 zobrazení/měsíc zdarma, bez API klíče
+            const screenshotUrl = `https://image.thum.io/get/width/1920/crop/1080/noanimate/${padletUrl}?t=${ts}`;
+            
+            const img = document.getElementById('screenshot');
+            const loading = document.getElementById('loading');
+
+            img.onload = () => {
+                loading.style.display = 'none';
+            };
+            img.onerror = () => {
+                loading.textContent = 'Chyba načítání, zkouším znovu...';
+                setTimeout(loadScreenshot, 10000);
+            };
+
+            img.src = screenshotUrl;
+        }
+
+        // Načti hned
+        loadScreenshot();
+
+        // Refresh každou hodinu (3 600 000 ms)
+        setInterval(() => {
+            location.reload();
+        }, 3600000);
+    </script>
 </body>
 </html>
