@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-<html>
+<html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title>Redirect</title>
-    <meta http-equiv="refresh" content="0; url=https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl">
+    <title>Padlet Bridge</title>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
+        object { width: 100%; height: 100%; border: none; }
+    </style>
 </head>
-<body style="background: #333; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
-    <p>Načítám nástěnku Padlet...</p>
-    <script>
-        // Pokud meta refresh selže, zkusíme to javascriptem
-        window.location.replace("https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl");
-    </script>
+<body>
+    <object data="https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl" type="text/html">
+        <embed src="https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl" type="text/html" />
+    </object>
 </body>
 </html>
