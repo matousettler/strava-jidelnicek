@@ -16,41 +16,16 @@
         .header { background: var(--bg-header); padding: 16px 24px; display: flex; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .header-title { display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 700; }
         .logo-img { width: 28px; height: 28px; object-fit: contain; }
-        
         .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; scroll-behavior: smooth; }
-        
-        .section-title { 
-            color: var(--accent-pink); font-size: 1rem; margin: 25px 0 10px 4px; font-weight: 800; 
-            text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(239, 145, 197, 0.2); padding-bottom: 5px; 
-        }
-
+        .section-title { color: var(--accent-pink); font-size: 1rem; margin: 25px 0 10px 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(239, 145, 197, 0.2); padding-bottom: 5px; }
         .card { background: var(--bg-card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-        
         .card-header { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
-
-        /* Růžová bublinka (Tag) */
-        .tag { 
-            background: var(--accent-pink); 
-            color: var(--bg-card); 
-            padding: 4px 10px; 
-            border-radius: 8px; 
-            font-weight: 800; 
-            font-size: 0.85rem; 
-            white-space: nowrap;
-            text-align: center; 
-            flex-shrink: 0; 
-        }
-
+        .tag { background: var(--accent-pink); color: var(--bg-card); padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; white-space: nowrap; text-align: center; flex-shrink: 0; }
         .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 700; color: var(--text-main); }
-
-        .meta { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+        .meta { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
         .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; margin-right: 4px; }
         .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
-        .allergen-tag { 
-            font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); 
-            padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); cursor: help; 
-        }
-
+        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); cursor: help; }
         .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
         .content::-webkit-scrollbar { width: 0; background: transparent; }
     </style>
@@ -88,6 +63,11 @@
         var label = document.getElementById('label');
         var parser = new DOMParser();
 
+        // Čtení filtru z URL
+        var urlParams = new URLSearchParams(window.location.search);
+        var druhParam = urlParams.get('Druh');
+        var allowedDruhy = druhParam ? druhParam.split(',').map(function(s) { return s.trim().toLowerCase(); }) : null;
+
         try {
             var response = await fetch('/api/menu');
             var data = await response.json();
@@ -122,31 +102,44 @@
 
             var groups = { "Lyčkovo nám.": [], "Pernerova": [], "Petra Strozziho": [] };
 
+            function isAllowed(druh) {
+                if (!allowedDruhy) return true;
+                return allowedDruhy.indexOf(druh.toLowerCase()) !== -1;
+            }
+
             if (day1806) {
                 var items = day1806.getElementsByTagName("jidlo");
                 for (var j = 0; j < items.length; j++) {
                     var druh = items[j].getAttribute("druh");
                     var nazev = items[j].getAttribute("nazev");
                     var alergeny = items[j].getAttribute("alergeny") || "";
-                    if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push({ druh: druh, nazev: nazev, alergeny: alergeny });
-                    if (druh.indexOf("P") !== -1) groups["Pernerova"].push({ druh: druh, nazev: nazev, alergeny: alergeny });
+                    
+                    if (isAllowed(druh)) {
+                        if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push({ druh: druh, nazev: nazev, alergeny: alergeny });
+                        if (druh.indexOf("P") !== -1) groups["Pernerova"].push({ druh: druh, nazev: nazev, alergeny: alergeny });
+                    }
                 }
             }
 
             if (day0398) {
                 var items = day0398.getElementsByTagName("jidlo");
                 for (var k = 0; k < items.length; k++) {
-                    groups["Petra Strozziho"].push({
-                        druh: items[k].getAttribute("druh"),
-                        nazev: items[k].getAttribute("nazev"),
-                        alergeny: items[k].getAttribute("alergeny") || ""
-                    });
+                    var druh = items[k].getAttribute("druh");
+                    if (isAllowed(druh)) {
+                        groups["Petra Strozziho"].push({
+                            druh: druh,
+                            nazev: items[k].getAttribute("nazev"),
+                            alergeny: items[k].getAttribute("alergeny") || ""
+                        });
+                    }
                 }
             }
 
             var html = '';
+            var hasAny = false;
             for (var groupName in groups) {
                 if (groups[groupName].length > 0) {
+                    hasAny = true;
                     html += '<div class="section-title">' + groupName + '</div>';
                     groups[groupName].forEach(function(m) {
                         var allergensHtml = '';
@@ -156,18 +149,11 @@
                                 return '<span class="allergen-tag" title="' + (ALLERGENS_MAP[clean] || 'Alergen') + '">' + clean + '</span>';
                             }).join('');
                         }
-
-                        html += '<div class="card">' +
-                                    '<div class="card-header">' +
-                                        '<div class="tag">' + m.druh + '</div>' + // Celý druh v bublince
-                                        '<div class="dish-name">' + m.nazev + '</div>' + // Jen jméno bez pomlčky
-                                    '</div>' +
-                                    (allergensHtml ? '<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">' + allergensHtml + '</div></div>' : '') +
-                                '</div>';
+                        html += '<div class="card"><div class="card-header"><div class="tag">' + m.druh + '</div><div class="dish-name">' + m.nazev + '</div></div>' + (allergensHtml ? '<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">' + allergensHtml + '</div></div>' : '') + '</div>';
                     });
                 }
             }
-            app.innerHTML = html || '<div class="status-msg">Pro tento den není menu nahrané.</div>';
+            app.innerHTML = hasAny ? html : '<div class="status-msg">Pro vybrané filtry není menu nahrané.</div>';
             startAutoScroll();
         } catch (e) { app.innerHTML = '<div class="status-msg">Chyba: ' + e.message + '</div>'; }
     }
