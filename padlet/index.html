@@ -1,16 +1,11 @@
-<!DOCTYPE html>
-<html lang="cs">
-<head>
-    <meta charset="UTF-8">
-    <title>Padlet Bridge</title>
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; }
-        object { width: 100%; height: 100%; border: none; }
-    </style>
-</head>
-<body>
-    <object data="https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl" type="text/html">
-        <embed src="https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl" type="text/html" />
-    </object>
+<body style="margin:0; background:black; overflow:hidden;">
+    <img id="padletImg" src="https://api.screenshotmachine.com/?key=9b8e2a&url=https://padlet.com/matousettler/zpravy-z-velke-britanie-a-irska-xet6al33uutzs6wl&dimension=1920x1080&device=desktop&format=png" style="width:100vw; height:100vh; object-fit: contain;">
+
+    <script>
+        // Každých 15 minut obrázek aktualizuje, aby tam byly nové zprávy
+        setInterval(function(){
+            var img = document.getElementById('padletImg');
+            img.src = img.src.split('&ts=')[0] + '&ts=' + new Date().getTime();
+        }, 900000);
+    </script>
 </body>
-</html>
