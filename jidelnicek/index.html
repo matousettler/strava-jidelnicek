@@ -16,17 +16,41 @@
         .header { background: var(--bg-header); padding: 16px 24px; display: flex; align-items: center; flex-shrink: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .header-title { display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 700; }
         .logo-img { width: 28px; height: 28px; object-fit: contain; }
+        
         .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; scroll-behavior: smooth; }
-        .section-title { color: var(--accent-pink); font-size: 1rem; margin: 25px 0 10px 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(239, 145, 197, 0.2); padding-bottom: 5px; }
+        
+        .section-title { 
+            color: var(--accent-pink); font-size: 1rem; margin: 25px 0 10px 4px; font-weight: 800; 
+            text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(239, 145, 197, 0.2); padding-bottom: 5px; 
+        }
+
         .card { background: var(--bg-card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-        .card-header { display: flex; gap: 12px; align-items: flex-start; }
-        .tag { background: var(--accent-pink); color: var(--bg-card); padding: 2px 6px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; min-width: 42px; text-align: center; flex-shrink: 0; }
-        .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 400; }
-        .dish-name b { color: var(--accent-pink); font-weight: 700; }
-        .meta { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+        
+        .card-header { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+
+        /* Růžová bublinka (Tag) */
+        .tag { 
+            background: var(--accent-pink); 
+            color: var(--bg-card); 
+            padding: 4px 10px; 
+            border-radius: 8px; 
+            font-weight: 800; 
+            font-size: 0.85rem; 
+            white-space: nowrap;
+            text-align: center; 
+            flex-shrink: 0; 
+        }
+
+        .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 700; color: var(--text-main); }
+
+        .meta { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
         .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; margin-right: 4px; }
         .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
-        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); cursor: help; }
+        .allergen-tag { 
+            font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); 
+            padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); cursor: help; 
+        }
+
         .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
         .content::-webkit-scrollbar { width: 0; background: transparent; }
     </style>
@@ -71,7 +95,6 @@
             var xml1806 = parser.parseFromString(data.xml1806, "text/xml");
             var xml0398 = parser.parseFromString(data.xml0398, "text/xml");
 
-            // LOGIKA DATUMU
             var now = new Date();
             var target = new Date(now.getTime());
             if (target.getDay() === 6) target.setDate(target.getDate() + 2);
@@ -82,67 +105,50 @@
             var d = String(target.getDate()).padStart(2, '0');
             var m = String(target.getMonth() + 1).padStart(2, '0');
             var y = target.getFullYear();
-            var searchStr1 = d + "-" + m + "-" + y;
-            var searchStr2 = d + "." + m + "." + y;
-            label.innerText = "Menu na " + d + "." + m + "." + y;
+            var dateStr = d + "." + m + "." + y;
+            label.innerText = "Menu na " + dateStr;
 
             function getDayNode(xml) {
                 var days = xml.getElementsByTagName("den");
                 for (var i = 0; i < days.length; i++) {
                     var attr = days[i].getAttribute("datum");
-                    if (attr === searchStr1 || attr === searchStr2) return days[i];
+                    if (attr === dateStr || attr === d + "-" + m + "-" + y) return days[i];
                 }
-                return days.length > 0 ? days[0] : null; // Fallback pro AMOS
+                return days.length > 0 ? days[0] : null;
             }
 
             var day1806 = getDayNode(xml1806);
             var day0398 = getDayNode(xml0398);
 
-            var groups = {
-                "Lyčkovo nám.": [],
-                "Pernerova": [],
-                "Petra Strozziho": []
-            };
+            var groups = { "Lyčkovo nám.": [], "Pernerova": [], "Petra Strozziho": [] };
 
-            // Zpracování 1806 (Lyčkovo vs Pernerova)
             if (day1806) {
-                var items1806 = day1806.getElementsByTagName("jidlo");
-                for (var j = 0; j < items1806.length; j++) {
-                    var druh = items1806[j].getAttribute("druh");
-                    var nazev = items1806[j].getAttribute("nazev");
-                    var alergeny = items1806[j].getAttribute("alergeny") || "";
-                    
-                    var item = { nazev: nazev, druh: druh, alergeny: alergeny };
-                    
-                    if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push(item);
-                    if (druh.indexOf("P") !== -1) groups["Pernerova"].push(item);
+                var items = day1806.getElementsByTagName("jidlo");
+                for (var j = 0; j < items.length; j++) {
+                    var druh = items[j].getAttribute("druh");
+                    var nazev = items[j].getAttribute("nazev");
+                    var alergeny = items[j].getAttribute("alergeny") || "";
+                    if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push({ druh: druh, nazev: nazev, alergeny: alergeny });
+                    if (druh.indexOf("P") !== -1) groups["Pernerova"].push({ druh: druh, nazev: nazev, alergeny: alergeny });
                 }
             }
 
-            // Zpracování 0398 (Petra Strozziho)
             if (day0398) {
-                var items0398 = day0398.getElementsByTagName("jidlo");
-                for (var k = 0; k < items0398.length; k++) {
+                var items = day0398.getElementsByTagName("jidlo");
+                for (var k = 0; k < items.length; k++) {
                     groups["Petra Strozziho"].push({
-                        nazev: items0398[k].getAttribute("nazev"),
-                        druh: items0398[k].getAttribute("druh"),
-                        alergeny: items0398[k].getAttribute("alergeny") || ""
+                        druh: items[k].getAttribute("druh"),
+                        nazev: items[k].getAttribute("nazev"),
+                        alergeny: items[k].getAttribute("alergeny") || ""
                     });
                 }
             }
 
             var html = '';
-            var hasAny = false;
-
             for (var groupName in groups) {
                 if (groups[groupName].length > 0) {
-                    hasAny = true;
                     html += '<div class="section-title">' + groupName + '</div>';
                     groups[groupName].forEach(function(m) {
-                        var parts = m.druh.split(' ');
-                        var tag = parts.length > 1 ? parts.pop() : m.druh;
-                        var baseDruh = parts.join(' ').trim() || m.druh;
-                        
                         var allergensHtml = '';
                         if (m.alergeny) {
                             allergensHtml = m.alergeny.split(',').map(function(code) {
@@ -153,25 +159,17 @@
 
                         html += '<div class="card">' +
                                     '<div class="card-header">' +
-                                        '<div class="tag">' + tag + '</div>' +
-                                        '<div class="dish-name"><b>' + baseDruh + ' ' + tag + '</b> - ' + m.nazev + '</div>' +
+                                        '<div class="tag">' + m.druh + '</div>' + // Celý druh v bublince
+                                        '<div class="dish-name">' + m.nazev + '</div>' + // Jen jméno bez pomlčky
                                     '</div>' +
                                     (allergensHtml ? '<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">' + allergensHtml + '</div></div>' : '') +
                                 '</div>';
                     });
                 }
             }
-
-            if (!hasAny) {
-                app.innerHTML = '<div class="status-msg">Pro tento den není menu nahrané ani pro jednu budovu.</div>';
-            } else {
-                app.innerHTML = html;
-                startAutoScroll();
-            }
-
-        } catch (e) {
-            app.innerHTML = '<div class="status-msg">Chyba při stahování dat: ' + e.message + '</div>';
-        }
+            app.innerHTML = html || '<div class="status-msg">Pro tento den není menu nahrané.</div>';
+            startAutoScroll();
+        } catch (e) { app.innerHTML = '<div class="status-msg">Chyba: ' + e.message + '</div>'; }
     }
     init();
 </script>
