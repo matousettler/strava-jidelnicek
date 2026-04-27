@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jídelníček Widget</title>
+    <title>Jídelníček</title>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -19,14 +19,13 @@
         .content { padding: 10px 20px 20px 20px; overflow-y: auto; flex-grow: 1; scroll-behavior: smooth; }
         .section-title { color: var(--accent-pink); font-size: 1rem; margin: 25px 0 10px 4px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(239, 145, 197, 0.2); padding-bottom: 5px; }
         .card { background: var(--bg-card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
-        .card-header { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+        .card-header { display: flex; gap: 14px; align-items: center; }
         .tag { background: var(--accent-pink); color: var(--bg-card); padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; white-space: nowrap; text-align: center; flex-shrink: 0; }
-        .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 700; color: var(--text-main); }
+        .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 700; }
         .meta { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-        .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; margin-right: 4px; }
-        .allergens { display: flex; gap: 4px; flex-wrap: wrap; }
-        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); cursor: help; }
-        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+        .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; }
+        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); margin-right: 3px; }
+        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); line-height: 1.6; }
         .content::-webkit-scrollbar { width: 0; background: transparent; }
     </style>
 </head>
@@ -35,16 +34,24 @@
     <div class="header">
         <div class="header-title">
             <img src="https://app.strava.cz/logo/logomark.svg" class="logo-img" alt="Logo">
-            <span id="label">Načítám menu...</span>
+            <span id="label">Načítám...</span>
         </div>
     </div>
     <div class="content" id="app">
-        <div class="status-msg">Načítám data z jídelen...</div>
+        <div class="status-msg">Načítám data z obou jídelen...</div>
     </div>
 </div>
 
 <script>
     var ALLERGENS_MAP = { "01":"Obiloviny s lepkem","1":"Obiloviny s lepkem","02":"Korýši","2":"Korýši","03":"Vejce","3":"Vejce","04":"Ryby","4":"Ryby","05":"Arašídy","5":"Arašídy","06":"Sója","6":"Sója","07":"Mléko","7":"Mléko","08":"Ořechy","8":"Ořechy","09":"Celer","9":"Celer","10":"Hořčice","11":"Sezam","12":"Siřičitany","13":"Vlčí bob","14":"Měkkýši" };
+
+    // Funkce pro odstranění diakritiky a mezer (pro bezpečné filtrování)
+    function slugify(text) {
+        if (!text) return "";
+        return text.toString().toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Odstraní háčky a čárky
+            .replace(/[\s\xa0]+/g, ''); // Odstraní všechny mezery
+    }
 
     function startAutoScroll() {
         var container = document.getElementById('app');
@@ -61,22 +68,18 @@
     async function init() {
         var app = document.getElementById('app');
         var label = document.getElementById('label');
-        var parser = new DOMParser();
-
+        
         var urlParams = new URLSearchParams(window.location.search);
         var druhParam = urlParams.get('Druh');
-        
-        // Vyčištění filtrů z URL
-        var allowedDruhy = druhParam ? druhParam.split(',').map(function(s) { 
-            return s.replace(/\s+/g, ' ').trim().toLowerCase(); 
-        }) : null;
+        var allowedSlugs = druhParam ? druhParam.split(',').map(slugify) : null;
 
         try {
             var response = await fetch('/api/menu');
             var data = await response.json();
+            var parser = new DOMParser();
             
-            var xml1806 = parser.parseFromString(data.xml1806, "text/xml");
-            var xml0398 = parser.parseFromString(data.xml0398, "text/xml");
+            var xml1 = parser.parseFromString(data.xml1806, "text/xml");
+            var xml2 = parser.parseFromString(data.xml0398, "text/xml");
 
             var now = new Date();
             var target = new Date(now.getTime());
@@ -100,67 +103,57 @@
                 return days.length > 0 ? days[0] : null;
             }
 
-            var day1806 = getDayNode(xml1806);
-            var day0398 = getDayNode(xml0398);
+            var day1806 = getDayNode(xml1);
+            var day0398 = getDayNode(xml2);
 
             var groups = { "Lyčkovo nám.": [], "Pernerova": [], "Petra Strozziho": [] };
 
-            function isAllowed(druh) {
-                if (!allowedDruhy) return true;
-                // Vyčištění druhu z XML od neviditelných mezer (char 160)
-                var cleanDruh = druh.replace(/\s+/g, ' ').trim().toLowerCase();
-                return allowedDruhy.indexOf(cleanDruh) !== -1;
-            }
-
-            if (day1806) {
-                var items = day1806.getElementsByTagName("jidlo");
-                for (var j = 0; j < items.length; j++) {
-                    var druh = items[j].getAttribute("druh");
-                    var nazev = items[j].getAttribute("nazev");
-                    var alergeny = items[j].getAttribute("alergeny") || "";
+            function processItems(node, sourceId) {
+                if (!node) return;
+                // Hledáme značky 'jidlo' i 'polozka' (pro jistotu)
+                var items = node.querySelectorAll("jidlo, polozka");
+                for (var i = 0; i < items.length; i++) {
+                    var druh = items[i].getAttribute("druh") || "";
+                    var nazev = items[i].getAttribute("nazev") || "";
+                    var alergeny = items[i].getAttribute("alergeny") || "";
                     
-                    if (isAllowed(druh)) {
-                        if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push({ druh: druh, nazev: nazev, alergeny: alergeny });
-                        if (druh.indexOf("P") !== -1) groups["Pernerova"].push({ druh: druh, nazev: nazev, alergeny: alergeny });
+                    var itemSlug = slugify(druh);
+                    
+                    // Kontrola filtru
+                    if (allowedSlugs && !allowedSlugs.some(s => itemSlug.includes(s))) continue;
+
+                    var obj = { druh: druh, nazev: nazev, alergeny: alergeny };
+
+                    if (sourceId === '1806') {
+                        if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push(obj);
+                        if (druh.indexOf("P") !== -1) groups["Pernerova"].push(obj);
+                    } else {
+                        groups["Petra Strozziho"].push(obj);
                     }
                 }
             }
 
-            if (day0398) {
-                var items = day0398.getElementsByTagName("jidlo");
-                for (var k = 0; k < items.length; k++) {
-                    var druh = items[k].getAttribute("druh");
-                    if (isAllowed(druh)) {
-                        groups["Petra Strozziho"].push({
-                            druh: druh,
-                            nazev: items[k].getAttribute("nazev"),
-                            alergeny: items[k].getAttribute("alergeny") || ""
-                        });
-                    }
-                }
-            }
+            processItems(day1806, '1806');
+            processItems(day0398, '0398');
 
             var html = '';
             var hasAny = false;
-            for (var groupName in groups) {
-                if (groups[groupName].length > 0) {
+            for (var gName in groups) {
+                if (groups[gName].length > 0) {
                     hasAny = true;
-                    html += '<div class="section-title">' + groupName + '</div>';
-                    groups[groupName].forEach(function(m) {
-                        var allergensHtml = '';
-                        if (m.alergeny) {
-                            allergensHtml = m.alergeny.split(',').map(function(code) {
-                                var clean = code.trim().split(' ')[0];
-                                return '<span class="allergen-tag" title="' + (ALLERGENS_MAP[clean] || 'Alergen') + '">' + clean + '</span>';
-                            }).join('');
-                        }
-                        html += '<div class="card"><div class="card-header"><div class="tag">' + m.druh + '</div><div class="dish-name">' + m.nazev + '</div></div>' + (allergensHtml ? '<div class="meta"><span class="allergen-label">Alergeny:</span><div class="allergens">' + allergensHtml + '</div></div>' : '') + '</div>';
+                    html += '<div class="section-title">' + gName + '</div>';
+                    groups[gName].forEach(function(m) {
+                        var allergens = m.alergeny ? m.alergeny.split(',').map(function(code) {
+                            var clean = code.trim().split(' ')[0];
+                            return '<span class="allergen-tag" title="' + (ALLERGENS_MAP[clean] || 'Alergen') + '">' + clean + '</span>';
+                        }).join('') : '';
+                        html += '<div class="card"><div class="card-header"><div class="tag">' + m.druh + '</div><div class="dish-name">' + m.nazev + '</div></div>' + (allergens ? '<div class="meta"><span class="allergen-label">Alergeny:</span>' + allergens + '</div>' : '') + '</div>';
                     });
                 }
             }
-            app.innerHTML = hasAny ? html : '<div class="status-msg">Pro vybrané filtry není v jídelně nic nahrané.</div>';
+            app.innerHTML = hasAny ? html : '<div class="status-msg">Pro tyto filtry nebyla nalezena žádná jídla.</div>';
             startAutoScroll();
-        } catch (e) { app.innerHTML = '<div class="status-msg">Chyba: ' + e.message + '</div>'; }
+        } catch (e) { app.innerHTML = '<div class="status-msg">Chyba při zpracování dat.</div>'; }
     }
     init();
 </script>
