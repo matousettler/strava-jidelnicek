@@ -5,16 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Padlet Nástěnka</title>
     <style>
-        /* Odstraní okraje stránky a zajistí, že se obsah nebude hýbat */
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
             width: 100%;
-            overflow: hidden; /* Zabrání dvojitému skrolování */
+            overflow: hidden;
         }
-
-        /* Roztáhne iframe na celou obrazovku */
         iframe {
             position: absolute;
             top: 0;
@@ -26,13 +23,10 @@
     </style>
 </head>
 <body>
-
     <iframe 
-        src="api/proxy" 
+        src="/api/padlet"
         allow="camera;microphone;geolocation;display-capture;clipboard-write"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
         allowfullscreen>
-</iframe>
-
+    </iframe>
 </body>
 </html>
