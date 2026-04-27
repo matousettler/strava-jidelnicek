@@ -5,7 +5,7 @@ export default async function handler(req) {
     access_key: 'cgw6R8brZUbS7Q',
     url: 'https://padlet.com/embed/xet6al33uutzs6wl',
     viewport_width: 1280,
-    viewport_height: 720,
+    viewport_height: 690,
     device_scale_factor: 3,
     viewport_device: 'ipad_landscape',
     format: 'png',
