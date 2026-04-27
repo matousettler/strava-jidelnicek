@@ -8,7 +8,6 @@ export default async function handler(req, res) {
       fetch(url0398).then(res => res.arrayBuffer())
     ]);
 
-    // Dekódování z windows-1250 (CP1250) na UTF-8
     const decoder = new TextDecoder('windows-1250');
     const xml1 = decoder.decode(r1);
     const xml2 = decoder.decode(r2);
