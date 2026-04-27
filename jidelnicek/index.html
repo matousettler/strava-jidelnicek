@@ -121,9 +121,10 @@
                     var obj = { druh: druh, nazev: nazev, alergeny: alergeny };
 
                     if (sourceId === '1806') {
-                        // Zde je oprava: vezmeme jen poslední část druhu (např. "L" nebo "P1")
-                        // aby se 'P' v "Polévka" nepletlo do Pernerovy
-                        var tag = druh.split(' ').pop(); 
+                        // OPRAVA: Rozdělíme název druhu a vezmeme jen poslední slovo (např. "L" nebo "P1")
+                        var parts = druh.split(' ');
+                        var tag = parts[parts.length - 1]; 
+                        
                         if (tag.indexOf("L") !== -1) groups["Lyčkovo nám."].push(obj);
                         if (tag.indexOf("P") !== -1) groups["Pernerova"].push(obj);
                     } else {
@@ -152,10 +153,7 @@
             }
             app.innerHTML = hasAny ? html : '<div class="status-msg">Pro tyto filtry nebyla nalezena žádná jídla.</div>';
             startAutoScroll();
-        } catch (e) { 
-            console.error(e);
-            app.innerHTML = '<div class="status-msg">Chyba při zpracování dat.</div>'; 
-        }
+        } catch (e) { app.innerHTML = '<div class="status-msg">Chyba při zpracování dat.</div>'; }
     }
     init();
 </script>
