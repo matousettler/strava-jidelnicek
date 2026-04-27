@@ -22,10 +22,9 @@
         .card-header { display: flex; gap: 14px; align-items: center; }
         .tag { background: var(--accent-pink); color: var(--bg-card); padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; white-space: nowrap; text-align: center; flex-shrink: 0; }
         .dish-name { line-height: 1.4; font-size: 1rem; font-weight: 700; }
-        .meta { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-        .allergen-label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; }
-        .allergen-tag { font-size: 0.7rem; background: rgba(255,255,255,0.06); color: var(--text-dim); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); margin-right: 3px; }
-        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); line-height: 1.6; }
+        .meta { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.75rem; color: var(--text-dim); }
+        .allergen-tag { background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); margin-left: 3px; }
+        .status-msg { text-align: center; padding: 60px 20px; color: var(--text-dim); }
         .content::-webkit-scrollbar { width: 0; background: transparent; }
     </style>
 </head>
@@ -37,20 +36,15 @@
             <span id="label">Načítám...</span>
         </div>
     </div>
-    <div class="content" id="app">
-        <div class="status-msg">Načítám data z obou jídelen...</div>
-    </div>
+    <div class="content" id="app"><div class="status-msg">Načítám data z obou jídelen...</div></div>
 </div>
 
 <script>
     var ALLERGENS_MAP = { "01":"Obiloviny s lepkem","1":"Obiloviny s lepkem","02":"Korýši","2":"Korýši","03":"Vejce","3":"Vejce","04":"Ryby","4":"Ryby","05":"Arašídy","5":"Arašídy","06":"Sója","6":"Sója","07":"Mléko","7":"Mléko","08":"Ořechy","8":"Ořechy","09":"Celer","9":"Celer","10":"Hořčice","11":"Sezam","12":"Siřičitany","13":"Vlčí bob","14":"Měkkýši" };
 
-    // Funkce pro odstranění diakritiky a mezer (pro bezpečné filtrování)
     function slugify(text) {
         if (!text) return "";
-        return text.toString().toLowerCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Odstraní háčky a čárky
-            .replace(/[\s\xa0]+/g, ''); // Odstraní všechny mezery
+        return text.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[\s\xa0]+/g, '');
     }
 
     function startAutoScroll() {
@@ -68,18 +62,24 @@
     async function init() {
         var app = document.getElementById('app');
         var label = document.getElementById('label');
-        
         var urlParams = new URLSearchParams(window.location.search);
         var druhParam = urlParams.get('Druh');
         var allowedSlugs = druhParam ? druhParam.split(',').map(slugify) : null;
 
         try {
             var response = await fetch('/api/menu');
-            var data = await response.json();
+            var json = await response.json();
+            var decoder = new TextDecoder('windows-1250');
+            function b64ToText(b64) {
+                var binString = atob(b64);
+                var bytes = new Uint8Array(binString.length);
+                for (var i = 0; i < binString.length; i++) bytes[i] = binString.charCodeAt(i);
+                return decoder.decode(bytes);
+            }
+
             var parser = new DOMParser();
-            
-            var xml1 = parser.parseFromString(data.xml1806, "text/xml");
-            var xml2 = parser.parseFromString(data.xml0398, "text/xml");
+            var xml1 = parser.parseFromString(b64ToText(json.b1806), "text/xml");
+            var xml2 = parser.parseFromString(b64ToText(json.b0398), "text/xml");
 
             var now = new Date();
             var target = new Date(now.getTime());
@@ -94,47 +94,42 @@
             var dateStr = d + "." + m + "." + y;
             label.innerText = "Menu na " + dateStr;
 
-            function getDayNode(xml) {
-                var days = xml.getElementsByTagName("den");
-                for (var i = 0; i < days.length; i++) {
-                    var attr = days[i].getAttribute("datum");
-                    if (attr === dateStr || attr === d + "-" + m + "-" + y) return days[i];
-                }
-                return days.length > 0 ? days[0] : null;
-            }
-
-            var day1806 = getDayNode(xml1);
-            var day0398 = getDayNode(xml2);
-
             var groups = { "Lyčkovo nám.": [], "Pernerova": [], "Petra Strozziho": [] };
 
-            function processItems(node, sourceId) {
+            function processItems(xml, sourceId) {
+                var days = xml.getElementsByTagName("den");
+                var node = null;
+                for (var i = 0; i < days.length; i++) {
+                    var attr = days[i].getAttribute("datum");
+                    if (attr === dateStr || attr === d + "-" + m + "-" + y) { node = days[i]; break; }
+                }
+                if (!node && days.length > 0) node = days[0];
                 if (!node) return;
-                // Hledáme značky 'jidlo' i 'polozka' (pro jistotu)
+
                 var items = node.querySelectorAll("jidlo, polozka");
-                for (var i = 0; i < items.length; i++) {
-                    var druh = items[i].getAttribute("druh") || "";
-                    var nazev = items[i].getAttribute("nazev") || "";
-                    var alergeny = items[i].getAttribute("alergeny") || "";
+                for (var j = 0; j < items.length; j++) {
+                    var druh = items[j].getAttribute("druh") || "";
+                    var nazev = items[j].getAttribute("nazev") || "";
+                    var alergeny = items[j].getAttribute("alergeny") || "";
                     
-                    var itemSlug = slugify(druh);
-                    
-                    // Kontrola filtru
-                    if (allowedSlugs && !allowedSlugs.some(s => itemSlug.includes(s))) continue;
+                    if (allowedSlugs && !allowedSlugs.some(s => slugify(druh).includes(s))) continue;
 
                     var obj = { druh: druh, nazev: nazev, alergeny: alergeny };
 
                     if (sourceId === '1806') {
-                        if (druh.indexOf("L") !== -1) groups["Lyčkovo nám."].push(obj);
-                        if (druh.indexOf("P") !== -1) groups["Pernerova"].push(obj);
+                        // OPRAVENÁ LOGIKA: Získáme jen kód na konci (např. "L" z "Polévka L")
+                        var tagPart = druh.indexOf(' ') !== -1 ? druh.split(' ').pop() : druh;
+                        
+                        if (tagPart.indexOf("L") !== -1) groups["Lyčkovo nám."].push(obj);
+                        if (tagPart.indexOf("P") !== -1) groups["Pernerova"].push(obj);
                     } else {
                         groups["Petra Strozziho"].push(obj);
                     }
                 }
             }
 
-            processItems(day1806, '1806');
-            processItems(day0398, '0398');
+            processItems(xml1, '1806');
+            processItems(xml2, '0398');
 
             var html = '';
             var hasAny = false;
@@ -143,11 +138,11 @@
                     hasAny = true;
                     html += '<div class="section-title">' + gName + '</div>';
                     groups[gName].forEach(function(m) {
-                        var allergens = m.alergeny ? m.alergeny.split(',').map(function(code) {
-                            var clean = code.trim().split(' ')[0];
-                            return '<span class="allergen-tag" title="' + (ALLERGENS_MAP[clean] || 'Alergen') + '">' + clean + '</span>';
+                        var alHtml = m.alergeny ? m.alergeny.split(',').map(function(c) {
+                            var cl = c.trim().split(' ')[0];
+                            return '<span class="allergen-tag" title="' + (ALLERGENS_MAP[cl] || 'Alergen') + '">' + cl + '</span>';
                         }).join('') : '';
-                        html += '<div class="card"><div class="card-header"><div class="tag">' + m.druh + '</div><div class="dish-name">' + m.nazev + '</div></div>' + (allergens ? '<div class="meta"><span class="allergen-label">Alergeny:</span>' + allergens + '</div>' : '') + '</div>';
+                        html += '<div class="card"><div class="card-header"><div class="tag">' + m.druh + '</div><div class="dish-name">' + m.nazev + '</div></div>' + (alHtml ? '<div class="meta"><span>Alergeny:</span>' + alHtml + '</div>' : '') + '</div>';
                     });
                 }
             }
